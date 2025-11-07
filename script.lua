@@ -1,6 +1,5 @@
 -- ====================================================================
---                 AUTO FISH V4.0 - RAYFIELD UI EDITION
---          Based on Working test.lua Fishing Method
+--                 RiooHub V1.0 - RAYFIELD UI EDITION
 -- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
@@ -59,7 +58,7 @@ local DefaultConfig = {
     CatchDelay = 0.2,
     SellDelay = 30,
     TeleportLocation = "Sisyphus Statue",
-    AutoFavorite = true,
+    AutoFavorite = false,
     FavoriteRarity = "Mythic"
 }
 
@@ -490,8 +489,8 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "🎣 Auto Fish V4.0",
-    LoadingTitle = "Ultra-Fast Fishing",
+    Name = "🎣 RiooHub V1.0",
+    LoadingTitle = "RiooHub - Fish It",
     LoadingSubtitle = "Working Method Implementation",
     ConfigurationSaving = {
         Enabled = false
@@ -499,12 +498,12 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- ====== MAIN TAB ======
-local MainTab = Window:CreateTab("🏠 Main", 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
 
 MainTab:CreateSection("Auto Fishing")
 
 local BlatantToggle = MainTab:CreateToggle({
-    Name = "⚡ BLATANT MODE (3x Faster!)",
+    Name = "⚡ BLATANT MODE",
     CurrentValue = Config.BlatantMode,
     Callback = function(value)
         Config.BlatantMode = value
@@ -609,59 +608,10 @@ MainTab:CreateButton({
     end
 })
 
--- ====== TELEPORT TAB (from dev1.lua) ======
-local TeleportTab = Window:CreateTab("🌍 Teleport", nil)
+-- ====== MAIN TAB ======
+local FavoriteTab = Window:CreateTab("Favorite", 4483362458)
 
-TeleportTab:CreateSection("📍 Locations")
-
-for locationName, _ in pairs(LOCATIONS) do
-    TeleportTab:CreateButton({
-        Name = locationName,
-        Callback = function()
-            Teleport.to(locationName)
-        end
-    })
-end
-
--- ====== SETTINGS TAB ======
-local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
-
-SettingsTab:CreateSection("Performance")
-
-local GPUToggle = SettingsTab:CreateToggle({
-    Name = "🖥️ GPU Saver Mode",
-    CurrentValue = Config.GPUSaver,
-    Callback = function(value)
-        Config.GPUSaver = value
-        if value then
-            enableGPU()
-        else
-            disableGPU()
-        end
-        saveConfig()
-    end
-})
-
--- ====== SETTINGS TAB ======
-local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
-
-SettingsTab:CreateSection("Performance")
-
-local GPUToggle = SettingsTab:CreateToggle({
-    Name = "🖥️ GPU Saver Mode",
-    CurrentValue = Config.GPUSaver,
-    Callback = function(value)
-        Config.GPUSaver = value
-        if value then
-            enableGPU()
-        else
-            disableGPU()
-        end
-        saveConfig()
-    end
-})
-
-SettingsTab:CreateSection("Auto Favorite")
+FavoriteTab:CreateSection("Auto Favorite")
 
 -- list semua rarity
 local rarityList = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
@@ -695,7 +645,7 @@ end
 
 -- buat toggle untuk tiap rarity
 for _, rarity in ipairs(rarityList) do
-    SettingsTab:CreateToggle({
+    FavoriteTab:CreateToggle({
         Name = "⭐ Favorite " .. rarity,
         CurrentValue = table.find(Config.FavoriteRarity, rarity) and true or false,
         Callback = function(value)
@@ -721,8 +671,41 @@ for _, rarity in ipairs(rarityList) do
     })
 end
 
+-- ====== TELEPORT TAB ======
+local TeleportTab = Window:CreateTab("Teleport", nil)
+
+TeleportTab:CreateSection("📍 Locations")
+
+for locationName, _ in pairs(LOCATIONS) do
+    TeleportTab:CreateButton({
+        Name = locationName,
+        Callback = function()
+            Teleport.to(locationName)
+        end
+    })
+end
+
+-- ====== SETTINGS TAB ======
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+
+SettingsTab:CreateSection("Performance")
+
+local GPUToggle = SettingsTab:CreateToggle({
+    Name = "🖥️ GPU Saver Mode",
+    CurrentValue = Config.GPUSaver,
+    Callback = function(value)
+        Config.GPUSaver = value
+        if value then
+            enableGPU()
+        else
+            disableGPU()
+        end
+        saveConfig()
+    end
+})
+
 -- ====== INFO TAB ======
-local InfoTab = Window:CreateTab("ℹ️ Info", 4483362458)
+local InfoTab = Window:CreateTab("Info", 4483362458)
 
 InfoTab:CreateParagraph({
     Title = "Features",
@@ -764,7 +747,7 @@ Rayfield:Notify({
     Image = 4483362458
 })
 
-print("🎣 Auto Fish V4.0 - Loaded!")
+print("🎣 RiooHub V1.0 - Loaded!")
 print("✅ Using YOUR working fishing method")
 print("✅ Blatant Mode available")
 print("✅ Teleport system from dev1.lua integrated")
