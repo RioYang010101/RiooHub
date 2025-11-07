@@ -642,6 +642,26 @@ local GPUToggle = SettingsTab:CreateToggle({
     end
 })
 
+-- ====== SETTINGS TAB ======
+local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
+
+SettingsTab:CreateSection("Performance")
+
+local GPUToggle = SettingsTab:CreateToggle({
+    Name = "🖥️ GPU Saver Mode",
+    CurrentValue = Config.GPUSaver,
+    Callback = function(value)
+        Config.GPUSaver = value
+        if value then
+            enableGPU()
+        else
+            disableGPU()
+        end
+        saveConfig()
+    end
+})
+
+-- ================= AUTO FAVORITE =================
 SettingsTab:CreateSection("Auto Favorite")
 
 local AutoFavoriteToggle = SettingsTab:CreateToggle({
@@ -654,21 +674,41 @@ local AutoFavoriteToggle = SettingsTab:CreateToggle({
     end
 })
 
--- Ganti FavoriteRarityDropdown
-local FavoriteRarityDropdown = SettingsTab:CreateDropdown({
-    Name = "Favorite Rarities (Multi-Select)",
-    Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
-    CurrentOption = {Config.FavoriteRarity}, -- awalnya satu, bisa ganti ke table
-    MultiSelect = true, -- Penting: aktifkan multi-select
-    Callback = function(selectedOptions)
-        Config.FavoriteRarity = selectedOptions -- sekarang bisa banyak rarity
-        print("[Config] Favorite rarities set to: " .. table.concat(selectedOptions, ", "))
-        saveConfig()
-    end
-})
+-- list semua rarity
+local rarityList = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
+-- pastikan Config.FavoriteRarity selalu table
+if type(Config.FavoriteRarity) ~= "table" then
+    Config.FavoriteRarity = {"Mythic"} -- default
+end
+
+-- buat toggle untuk tiap rarity
+for _, rarity in ipairs(rarityList) do
+    SettingsTab:CreateToggle({
+        Name = "⭐ Favorite " .. rarity,
+        CurrentValue = table.find(Config.FavoriteRarity, rarity) and true or false,
+        Callback = function(value)
+            if value then
+                if not table.find(Config.FavoriteRarity, rarity) then
+                    table.insert(Config.FavoriteRarity, rarity)
+                end
+            else
+                for i, r in ipairs(Config.FavoriteRarity) do
+                    if r == rarity then
+                        table.remove(Config.FavoriteRarity, i)
+                        break
+                    end
+                end
+            end
+            saveConfig()
+            print("[Config] Favorite rarities now: " .. table.concat(Config.FavoriteRarity, ", "))
+        end
+    })
+end
+
+-- tombol manual favorite semua item
 SettingsTab:CreateButton({
-    Name = "⭐ Favorite All Mythic/Secret Now",
+    Name = "⭐ Favorite Selected Rarities Now",
     Callback = function()
         autoFavoriteByRarity()
     end
