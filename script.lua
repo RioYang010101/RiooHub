@@ -53,6 +53,7 @@ local DefaultConfig = {
     AutoSell = false,
     AutoCatch = false,
     GPUSaver = false,
+    AntiLag = false,
     BlatantMode = false,
     FishDelay = 0.9,
     CatchDelay = 0.2,
@@ -426,81 +427,6 @@ local function fishingV1Loop()
     fishingActive = false
 end
 
--- =========================
--- AutoFish V2 (Compatible V1)
--- =========================
-
--- Pastikan Events sudah ada
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-
--- Ambil Events dari V1
-local Events = ReplicatedStorage:FindFirstChild("Events")
-if not Events then
-    warn("[AutoFishV2] Events tidak ditemukan di ReplicatedStorage. V2 tidak aktif.")
-    return
-end
-
--- Global toggles
-getgenv().AutoFishV2 = false
-getgenv().AutoPerfectCastV2 = false
-
--- Delay konfigurasi
-local FISHING_DELAY = 0.1
-local AUTO_CATCH_DELAY = 0.1
-local PERFECT_CAST_WINDOW = 0.2
-
--- Helper functions
-local function autoCast()
-    pcall(function()
-        Events.equip:FireServer(1)
-        task.wait(0.05)
-        Events.charge:InvokeServer(1755848498.4834)
-        task.wait(0.02)
-        Events.minigame:InvokeServer(1.2854545116425, 1)
-        print("[V2] 🎣 Cast")
-    end)
-end
-
-local function autoCatch()
-    pcall(function()
-        Events.fishing:FireServer()
-        print("[V2] ✅ Reel")
-    end)
-end
-
--- Contoh deteksi Perfect Cast (bisa disesuaikan)
-local function isPerfectCastTime()
-    local gui = LocalPlayer.PlayerGui:FindFirstChild("FishingUI")
-    if gui and gui:FindFirstChild("Bar") then
-        local barValue = gui.Bar.Position.X.Scale
-        return math.abs(barValue - 0.5) <= PERFECT_CAST_WINDOW
-    end
-    return false
-end
-
-local function doPerfectCast()
-    -- Bisa pakai autoCast + timing atau modifikasi sesuai V1
-    autoCast()
-end
-
--- Loop utama V2
-local function fishingV2Loop()
-    while getgenv().AutoFishV2 do
-        task.wait(FISHING_DELAY)
-        pcall(autoCast)
-
-        task.wait(AUTO_CATCH_DELAY)
-        pcall(autoCatch)
-
-        if getgenv().AutoPerfectCastV2 and isPerfectCastTime() then
-            pcall(doPerfectCast)
-        end
-    end
-end
-
 -- ====================================================================
 --                     AUTO CATCH (SPAM SYSTEM)
 -- ====================================================================
@@ -573,9 +499,6 @@ local BlatantToggle = MainTab:CreateToggle({
     end
 })
 
--- =========================================
--- MENU TOGGLE
--- =========================================
 local AutoFishV1Toggle = MainTab:CreateToggle({
     Name = "🎣 Auto Fish V1",
     CurrentValue = false,
@@ -587,29 +510,6 @@ local AutoFishV1Toggle = MainTab:CreateToggle({
     end
 })
 
--- =========================
--- Menu Toggle (Rayfield)
--- =========================
-local FishingTab = Window:CreateTab("Fishing",4483362458)
-
-FishingTab:CreateToggle({
-    Name = "🤖 Auto Fish V2",
-    CurrentValue = false,
-    Callback = function(value)
-        getgenv().AutoFishV2 = value
-        if value then
-            task.spawn(fishingV2Loop)
-        end
-    end
-})
-
-FishingTab:CreateToggle({
-    Name = "🎯 Auto Perfect Cast V2",
-    CurrentValue = false,
-    Callback = function(value)
-        getgenv().AutoPerfectCastV2 = value
-    end
-})
 local AutoCatchToggle = MainTab:CreateToggle({
     Name = "🎯 Auto Catch (Extra Speed)",
     CurrentValue = Config.AutoCatch,
@@ -768,6 +668,36 @@ end
 local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
 SettingsTab:CreateSection("Performance")
+
+local AntiLagToggle = SettingsTab:CreateToggle({
+    Name = "Anti Lag / Low Texture",
+    CurrentValue = Config.AntiLag,
+    Callback = function(value)
+        Config.AntiLag = value
+
+        if value then
+            -- Enable Anti Lag
+            for _, obj in pairs(game:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Explosion") then
+                    obj:Destroy()
+                elseif obj:IsA("BasePart") then
+                    obj.Material = Enum.Material.Plastic
+                    obj.Reflectance = 0
+                end
+            end
+        else
+            -- Disable Anti Lag: bisa dikembalikan ke default (opsional)
+            for _, obj in pairs(game:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Reflectance = 0
+                end
+            end
+        end
+
+        saveConfig()
+    end
+})
 
 local GPUToggle = SettingsTab:CreateToggle({
     Name = "🖥️ GPU Saver Mode",
