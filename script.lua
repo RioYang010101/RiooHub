@@ -336,7 +336,7 @@ task.spawn(function()
 end)
 
 -- ====================================================================
---                     FISHING LOGIC (FROM YOUR test.lua)
+--                     FISHING - V1
 -- ====================================================================
 local isFishing = false
 local fishingActive = false
@@ -440,6 +440,70 @@ local function fishingLoop()
     end
 end
 
+-- ==================================================
+-- FISHING V2
+-- ==================================================
+
+-- Global toggles
+getgenv().AutoFishV2 = false
+getgenv().AutoPerfectCastV2 = false
+
+-- Konfigurasi delay (sesuaikan dengan script original)
+local FISHING_DELAY = 0.1       -- Delay sebelum cast
+local AUTO_CATCH_DELAY = 0.1    -- Delay sebelum catch
+local PERFECT_CAST_WINDOW = 0.2 -- Waktu untuk perfect cast
+
+-- Fungsi helper (copy dari script orang)
+local function autoCast()
+    -- Ganti dengan request casting di game
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.RequestFishingCast:FireServer()
+    end)
+    if not success then
+        warn("AutoCast error:", err)
+    end
+end
+
+local function autoCatch()
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.RequestFishingCatch:FireServer()
+    end)
+    if not success then
+        warn("AutoCatch error:", err)
+    end
+end
+
+local function isPerfectCastTime()
+    -- Deteksi perfect cast (misal berdasarkan posisi / timing)
+    -- Bisa disesuaikan sesuai script asli
+    local barValue = game:GetService("Players").LocalPlayer.PlayerGui.FishingUI.Bar.Position.X.Scale
+    return math.abs(barValue - 0.5) <= PERFECT_CAST_WINDOW
+end
+
+local function doPerfectCast()
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.RequestPerfectCast:FireServer()
+    end)
+    if not success then
+        warn("PerfectCast error:", err)
+    end
+end
+
+-- Loop utama Auto Fish V2
+local function fishingV2Loop()
+    while getgenv().AutoFishV2 do
+        task.wait(FISHING_DELAY)
+        pcall(autoCast)
+
+        task.wait(AUTO_CATCH_DELAY)
+        pcall(autoCatch)
+
+        if getgenv().AutoPerfectCastV2 and isPerfectCastTime() then
+            pcall(doPerfectCast)
+        end
+    end
+end
+
 -- ====================================================================
 --                     AUTO CATCH (SPAM SYSTEM)
 -- ====================================================================
@@ -512,8 +576,8 @@ local BlatantToggle = MainTab:CreateToggle({
     end
 })
 
-local AutoFishToggle = MainTab:CreateToggle({
-    Name = "🤖 Auto Fish",
+local AutoFishV1Toggle = MainTab:CreateToggle({
+    Name = "🤖 Auto Fish V1",
     CurrentValue = Config.AutoFish,
     Callback = function(value)
         Config.AutoFish = value
@@ -528,6 +592,25 @@ local AutoFishToggle = MainTab:CreateToggle({
         end
 
         saveConfig()
+    end
+})
+
+local AutoFishV2Toggle = MainTab:CreateToggle({
+    Name = "🤖 Auto Fish V2",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AutoFishV2 = value
+        if value then
+            task.spawn(fishingV2Loop)
+        end
+    end
+})
+
+local AutoPerfectV2Toggle =MainTab:CreateToggle({
+    Name = "🎯 Auto Perfect Cast V2",
+    CurrentValue = false,
+    Callback = function(value)
+        getgenv().AutoPerfectCastV2 = value
     end
 })
 
