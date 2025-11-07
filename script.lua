@@ -444,42 +444,59 @@ end
 -- FISHING V2
 -- ==================================================
 
-local remotes = game:GetService("ReplicatedStorage"):WaitForChild("FishingRemotes")
+-- Ambil ReplicatedStorage
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Coba ambil FishingRemotes dengan aman
+local remotes = ReplicatedStorage:FindFirstChild("FishingRemotes")
+if not remotes then
+    warn("FishingRemotes tidak ditemukan di ReplicatedStorage, AutoFishV2 tidak aktif")
+end
 
 -- Global toggles
 getgenv().AutoFishV2 = false
 getgenv().AutoPerfectCastV2 = false
 
+-- Delay (sesuaikan script original)
 local FISHING_DELAY = 0.1
 local AUTO_CATCH_DELAY = 0.1
 local PERFECT_CAST_WINDOW = 0.2
 
+-- Fungsi helper (tetap sama seperti script asli)
 local function autoCast()
-    local success, err = pcall(function()
-        remotes.RequestFishingCast:FireServer()
-    end)
-    if not success then warn("AutoCast error:", err) end
+    if remotes and remotes:FindFirstChild("RequestFishingCast") then
+        pcall(function()
+            remotes.RequestFishingCast:FireServer()
+        end)
+    end
 end
 
 local function autoCatch()
-    local success, err = pcall(function()
-        remotes.RequestFishingCatch:FireServer()
-    end)
-    if not success then warn("AutoCatch error:", err) end
+    if remotes and remotes:FindFirstChild("RequestFishingCatch") then
+        pcall(function()
+            remotes.RequestFishingCatch:FireServer()
+        end)
+    end
 end
 
 local function isPerfectCastTime()
-    local barValue = game:GetService("Players").LocalPlayer.PlayerGui.FishingUI.Bar.Position.X.Scale
-    return math.abs(barValue - 0.5) <= PERFECT_CAST_WINDOW
+    local player = game:GetService("Players").LocalPlayer
+    local bar = player.PlayerGui:FindFirstChild("FishingUI") and player.PlayerGui.FishingUI:FindFirstChild("Bar")
+    if bar then
+        return math.abs(bar.Position.X.Scale - 0.5) <= PERFECT_CAST_WINDOW
+    end
+    return false
 end
 
 local function doPerfectCast()
-    local success, err = pcall(function()
-        remotes.RequestPerfectCast:FireServer()
-    end)
-    if not success then warn("PerfectCast error:", err) end
+    if remotes and remotes:FindFirstChild("RequestPerfectCast") then
+        pcall(function()
+            remotes.RequestPerfectCast:FireServer()
+        end)
+    end
 end
 
+-- Loop utama AutoFishV2
 local function fishingV2Loop()
     while getgenv().AutoFishV2 do
         task.wait(FISHING_DELAY)
@@ -493,6 +510,10 @@ local function fishingV2Loop()
         end
     end
 end
+
+-- Contoh cara start
+-- getgenv().AutoFishV2 = true
+-- spawn(fishingV2Loop)
 
 -- ====================================================================
 --                     AUTO CATCH (SPAM SYSTEM)
