@@ -338,20 +338,8 @@ end)
 -- ====================================================================
 --                     FISHING - V1
 -- ====================================================================
--- SERVICES
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
 -- GLOBAL TOGGLES
 getgenv().AutoFishV1 = false
-getgenv().AutoFishV2 = false
-getgenv().AutoPerfectCastV2 = false
-
--- CONFIG DELAY
-local FISHING_DELAY = 0.1
-local AUTO_CATCH_DELAY = 0.1
-local PERFECT_CAST_WINDOW = 0.2
 
 -- =========================================
 -- V1 SETUP (Events)
@@ -438,34 +426,52 @@ local function fishingV1Loop()
     fishingActive = false
 end
 
--- =========================================
--- V2 SETUP (Dynamic Remotes)
--- =========================================
-local function findRemoteByKeyword(keyword)
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name:lower():find(keyword:lower()) then
-            return obj
-        end
-    end
-    return nil
+-- =========================
+-- AutoFish V2 (Compatible V1)
+-- =========================
+
+-- Pastikan Events sudah ada
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+-- Ambil Events dari V1
+local Events = ReplicatedStorage:FindFirstChild("Events")
+if not Events then
+    warn("[AutoFishV2] Events tidak ditemukan di ReplicatedStorage. V2 tidak aktif.")
+    return
 end
 
-local remoteCast = findRemoteByKeyword("Cast")
-local remoteCatch = findRemoteByKeyword("Catch")
-local remotePerfect = findRemoteByKeyword("PerfectCast")
+-- Global toggles
+getgenv().AutoFishV2 = false
+getgenv().AutoPerfectCastV2 = false
 
-if not remoteCast or not remoteCatch then
-    warn("[V2] Remote cast atau catch tidak ditemukan, V2 tidak aktif.")
-end
+-- Delay konfigurasi
+local FISHING_DELAY = 0.1
+local AUTO_CATCH_DELAY = 0.1
+local PERFECT_CAST_WINDOW = 0.2
 
+-- Helper functions
 local function autoCast()
-    pcall(function() remoteCast:FireServer() end)
+    pcall(function()
+        Events.equip:FireServer(1)
+        task.wait(0.05)
+        Events.charge:InvokeServer(1755848498.4834)
+        task.wait(0.02)
+        Events.minigame:InvokeServer(1.2854545116425, 1)
+        print("[V2] 🎣 Cast")
+    end)
 end
 
 local function autoCatch()
-    pcall(function() remoteCatch:FireServer() end)
+    pcall(function()
+        Events.fishing:FireServer()
+        print("[V2] ✅ Reel")
+    end)
 end
 
+-- Contoh deteksi Perfect Cast (bisa disesuaikan)
 local function isPerfectCastTime()
     local gui = LocalPlayer.PlayerGui:FindFirstChild("FishingUI")
     if gui and gui:FindFirstChild("Bar") then
@@ -476,17 +482,19 @@ local function isPerfectCastTime()
 end
 
 local function doPerfectCast()
-    if remotePerfect then
-        pcall(function() remotePerfect:FireServer() end)
-    end
+    -- Bisa pakai autoCast + timing atau modifikasi sesuai V1
+    autoCast()
 end
 
+-- Loop utama V2
 local function fishingV2Loop()
-    while getgenv().AutoFishV2 and remoteCast and remoteCatch do
+    while getgenv().AutoFishV2 do
         task.wait(FISHING_DELAY)
         pcall(autoCast)
+
         task.wait(AUTO_CATCH_DELAY)
         pcall(autoCatch)
+
         if getgenv().AutoPerfectCastV2 and isPerfectCastTime() then
             pcall(doPerfectCast)
         end
@@ -579,7 +587,12 @@ local AutoFishV1Toggle = MainTab:CreateToggle({
     end
 })
 
-local AutoFishV2Toggle = MainTab:CreateToggle({
+-- =========================
+-- Menu Toggle (Rayfield)
+-- =========================
+local FishingTab = Window:CreateTab("Fishing",4483362458)
+
+FishingTab:CreateToggle({
     Name = "🤖 Auto Fish V2",
     CurrentValue = false,
     Callback = function(value)
@@ -590,14 +603,13 @@ local AutoFishV2Toggle = MainTab:CreateToggle({
     end
 })
 
-local PerfectCastToggle = MainTab:CreateToggle({
-    Name = "🎯 Perfect Cast V2",
+FishingTab:CreateToggle({
+    Name = "🎯 Auto Perfect Cast V2",
     CurrentValue = false,
     Callback = function(value)
         getgenv().AutoPerfectCastV2 = value
     end
 })
-
 local AutoCatchToggle = MainTab:CreateToggle({
     Name = "🎯 Auto Catch (Extra Speed)",
     CurrentValue = Config.AutoCatch,
