@@ -280,11 +280,9 @@ end
 local function autoFavoriteByRarity()
     if not Config.AutoFavorite then return end
 
-    local targetRarity = Config.FavoriteRarity
-    local targetValue = getRarityValue(targetRarity)
-
-    if targetValue < 6 then
-        targetValue = 6
+    local targetRarities = Config.FavoriteRarity
+    if type(targetRarities) == "string" then
+        targetRarities = {targetRarities} -- pastikan selalu table
     end
 
     local favorited = 0
@@ -292,17 +290,24 @@ local function autoFavoriteByRarity()
 
     local success = pcall(function()
         local items = PlayerData:GetExpect("Inventory").Items
-
         if not items or #items == 0 then return end
 
-        for i, item in ipairs(items) do
+        for _, item in ipairs(items) do
             local data = ItemUtility:GetItemData(item.Id)
             if data and data.Data then
                 local itemName = data.Data.Name or "Unknown"
                 local rarity = getFishRarity(data)
-                local rarityValue = getRarityValue(rarity)
 
-                if rarityValue >= targetValue and rarityValue >= 6 then
+                -- cek jika rarity ada di list target
+                local shouldFavorite = false
+                for _, r in ipairs(targetRarities) do
+                    if rarity == r then
+                        shouldFavorite = true
+                        break
+                    end
+                end
+
+                if shouldFavorite then
                     if not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
                         Events.favorite:FireServer(item.UUID)
                         favoritedItems[item.UUID] = true
@@ -649,13 +654,15 @@ local AutoFavoriteToggle = SettingsTab:CreateToggle({
     end
 })
 
+-- Ganti FavoriteRarityDropdown
 local FavoriteRarityDropdown = SettingsTab:CreateDropdown({
-    Name = "Favorite Rarity (Mythic/Secret Only)",
-    Options = {"Mythic", "Secret"},
-    CurrentOption = Config.FavoriteRarity,
-    Callback = function(option)
-        Config.FavoriteRarity = option
-        print("[Config] Favorite rarity set to: " .. option .. "+")
+    Name = "Favorite Rarities (Multi-Select)",
+    Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
+    CurrentOption = {Config.FavoriteRarity}, -- awalnya satu, bisa ganti ke table
+    MultiSelect = true, -- Penting: aktifkan multi-select
+    Callback = function(selectedOptions)
+        Config.FavoriteRarity = selectedOptions -- sekarang bisa banyak rarity
+        print("[Config] Favorite rarities set to: " .. table.concat(selectedOptions, ", "))
         saveConfig()
     end
 })
