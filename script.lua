@@ -1,6 +1,6 @@
--- ====================================================================
---                 AUTO FISH V4.4 - SAFE REQUIRE + MULTI-RARITY
--- ====================================================================
+-- ================================================================
+--          SAFE FALLBACK AUTO FISH v4.5 - NO NET CRASH
+-- ================================================================
 
 -- ====== CORE SERVICES ======
 local Players = game:GetService("Players")
@@ -25,7 +25,7 @@ local DefaultConfig = {
     SellDelay = 30,
     TeleportLocation = "Sisyphus Statue",
     AutoFavorite = false,
-    FavoriteRarities = {"Mythic","Secret"} -- default selected
+    FavoriteRarities = {"Mythic","Secret"} -- default
 }
 
 local Config = {}
@@ -62,33 +62,36 @@ local LOCATIONS = {
     ["Coral Reefs"] = CFrame.new(-3114.78, 1.32, 2237.52)
 }
 
--- ====== NETWORK EVENTS ======
+-- ====== SAFE NETWORK MODULE ======
 local net
+local Events = {}
+local NetAvailable = false
 do
     local success, module = pcall(function()
         local Packages = ReplicatedStorage:FindFirstChild("Packages")
         local netModule = Packages and Packages:FindFirstChild("_Index") and Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
         if netModule then return require(netModule).net end
     end)
-    if success then net=module else warn("[Auto Fish] Net module not loaded") end
+    if success and module then
+        net=module
+        Events = {
+            fishing = net:FindFirstChild("RE/FishingCompleted"),
+            sell = net:FindFirstChild("RF/SellAllItems"),
+            charge = net:FindFirstChild("RF/ChargeFishingRod"),
+            minigame = net:FindFirstChild("RF/RequestFishingMinigameStarted"),
+            equip = net:FindFirstChild("RE/EquipToolFromHotbar"),
+            unequip = net:FindFirstChild("RE/UnequipToolFromHotbar"),
+            favorite = net:FindFirstChild("RE/FavoriteItem")
+        }
+        NetAvailable=true
+        print("[Safe Auto Fish] Network module loaded ✅")
+    else
+        warn("[Safe Auto Fish] Net module NOT found. Auto Fish / Auto Sell / Auto Catch disabled ⚠️")
+        NetAvailable=false
+    end
 end
 
-if not net then
-    warn("[Auto Fish] Cannot continue without net module")
-    return
-end
-
-local Events = {
-    fishing = net:WaitForChild("RE/FishingCompleted"),
-    sell = net:WaitForChild("RF/SellAllItems"),
-    charge = net:WaitForChild("RF/ChargeFishingRod"),
-    minigame = net:WaitForChild("RF/RequestFishingMinigameStarted"),
-    equip = net:WaitForChild("RE/EquipToolFromHotbar"),
-    unequip = net:WaitForChild("RE/UnequipToolFromHotbar"),
-    favorite = net:WaitForChild("RE/FavoriteItem")
-}
-
--- ====== SAFE MODULE REQUIRE ======
+-- ====== SAFE MODULES ======
 local ItemUtility, Replion, PlayerData
 do
     -- ItemUtility
@@ -96,7 +99,7 @@ do
         local module = ReplicatedStorage:FindFirstChild("Shared") and ReplicatedStorage.Shared:FindFirstChild("ItemUtility")
         if module then return require(module) end
     end)
-    if s then ItemUtility = r else warn("ItemUtility module not found") end
+    if s then ItemUtility = r else warn("[Safe Auto Fish] ItemUtility missing") end
 
     -- Replion & PlayerData
     s,r = pcall(function()
@@ -106,7 +109,7 @@ do
     if s and r and r.Client then
         Replion=r
         PlayerData=r.Client:WaitReplion("Data")
-    else warn("Replion module not loaded") end
+    else warn("[Safe Auto Fish] Replion missing") end
 end
 
 -- ====== RARITY SYSTEM ======
@@ -114,7 +117,7 @@ local RarityTiers={Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,Secret
 local function getRarityValue(r) return RarityTiers[r] or 0 end
 local function getFishRarity(itemData) if not itemData or not itemData.Data then return "Common" end return itemData.Data.Rarity or "Common" end
 
--- ====== TELEPORT ======
+-- ====== TELEPORT FUNCTION ======
 local Teleport={}
 function Teleport.to(loc)
     local cf=LOCATIONS[loc]
@@ -197,7 +200,9 @@ local function autoFavoriteByRarity()
         if data and data.Data then
             local rarity=getFishRarity(data)
             if table.find(targetRarities,rarity) and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
-                pcall(function() Events.favorite:FireServer(item.UUID) end)
+                if NetAvailable and Events.favorite then
+                    pcall(function() Events.favorite:FireServer(item.UUID) end)
+                end
                 favoritedItems[item.UUID]=true
             end
         end
@@ -210,11 +215,12 @@ task.spawn(function()
     end
 end)
 
--- ====== FISHING LOGIC ======
+-- ====== AUTO FISH SAFE ======
 local isFishing=false
 local fishingActive=false
 
 local function castRod()
+    if not NetAvailable then return end
     pcall(function()
         Events.equip:FireServer(1)
         task.wait(0.05)
@@ -223,25 +229,14 @@ local function castRod()
         Events.minigame:InvokeServer(1.2854545116425,1)
     end)
 end
-local function reelIn() pcall(function() Events.fishing:FireServer() end) end
-
-local function blatantFishingLoop()
-    while fishingActive and Config.BlatantMode do
-        if not isFishing then
-            isFishing=true
-            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
-            task.wait(0.05)
-            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
-            task.wait(Config.FishDelay)
-            for i=1,5 do pcall(function() Events.fishing:FireServer() end) task.wait(0.01) end
-            task.wait(Config.CatchDelay*0.5)
-            isFishing=false
-        else task.wait(0.01) end
-    end
+local function reelIn()
+    if not NetAvailable then return end
+    pcall(function() Events.fishing:FireServer() end)
 end
 
-local function normalFishingLoop()
-    while fishingActive and not Config.BlatantMode do
+local function fishingLoop()
+    if not NetAvailable then return end
+    while fishingActive do
         if not isFishing then
             isFishing=true
             castRod()
@@ -253,25 +248,22 @@ local function normalFishingLoop()
     end
 end
 
-local function fishingLoop()
-    while fishingActive do
-        if Config.BlatantMode then blatantFishingLoop() else normalFishingLoop() end
-        task.wait(0.1)
-    end
-end
-
--- ====== AUTO CATCH ======
+-- ====== AUTO CATCH SAFE ======
 task.spawn(function()
     while true do
-        if Config.AutoCatch and not isFishing then
+        if Config.AutoCatch and NetAvailable and not isFishing then
             pcall(function() Events.fishing:FireServer() end)
         end
         task.wait(Config.CatchDelay)
     end
 end)
 
--- ====== AUTO SELL ======
-local function simpleSell() pcall(function() Events.sell:InvokeServer() end) end
+-- ====== AUTO SELL SAFE ======
+local function simpleSell()
+    if not NetAvailable or not Events.sell then return end
+    pcall(function() Events.sell:InvokeServer() end)
+end
+
 task.spawn(function()
     while true do
         task.wait(Config.SellDelay)
@@ -281,12 +273,12 @@ end)
 
 -- ====== RAYFIELD UI ======
 local Rayfield=loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Window=Rayfield:CreateWindow({Name="🎣 RiooHub V4.4",LoadingTitle="Auto Fish",LoadingSubtitle="Safe Require + Multi-Rarity",ConfigurationSaving={Enabled=false}})
+local Window=Rayfield:CreateWindow({Name="🎣 RiooHub v4.5",LoadingTitle="Safe Auto Fish",LoadingSubtitle="Fallback Version",ConfigurationSaving={Enabled=false}})
 
 -- MAIN TAB
-local MainTab=Window:CreateTab("Main",4483362458)
+local MainTab=Window:CreateTab("Main")
 MainTab:CreateToggle({Name="⚡ Blatant Mode",CurrentValue=Config.BlatantMode,Callback=function(v) Config.BlatantMode=v saveConfig() end})
-MainTab:CreateToggle({Name="🤖 Auto Fish",CurrentValue=Config.AutoFish,Callback=function(v) Config.AutoFish=v fishingActive=v if v then task.spawn(fishingLoop) end saveConfig() end})
+MainTab:CreateToggle({Name="🤖 Auto Fish",CurrentValue=Config.AutoFish,Callback=function(v) Config.AutoFish=v fishingActive=v if v and NetAvailable then task.spawn(fishingLoop) end saveConfig() end})
 MainTab:CreateToggle({Name="🎯 Auto Catch",CurrentValue=Config.AutoCatch,Callback=function(v) Config.AutoCatch=v saveConfig() end})
 MainTab:CreateMultiDropdown({Name="Favorite Rarities",Options={"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"},CurrentOptions=Config.FavoriteRarities,Callback=function(opts) Config.FavoriteRarities=opts saveConfig() end})
 MainTab:CreateToggle({Name="⭐ Auto Favorite",CurrentValue=Config.AutoFavorite,Callback=function(v) Config.AutoFavorite=v saveConfig() end})
@@ -306,13 +298,11 @@ SettingsTab:CreateToggle({Name="🖥️ GPU Saver",CurrentValue=Config.GPUSaver,
 
 -- INFO TAB
 local InfoTab=Window:CreateTab("Info")
-InfoTab:CreateParagraph({Title="Features",Content=[[• Auto Fish with Blatant Mode
-• Auto Catch
-• Auto Sell (keeps favorited)
-• Auto Favorite Multi-Rarity
+InfoTab:CreateParagraph({Title="Features",Content=[[• Auto Favorite Multi-Rarity
+• Safe fallback (no crash if net missing)
 • GPU Saver
 • Anti-AFK
 • Teleport System]]})
 
-Rayfield:Notify({Title="Auto Fish Loaded",Content="Safe Require + Multi-Rarity Enabled",Duration=5})
-print("🎣 RiooHub V4.4 Loaded!")
+Rayfield:Notify({Title="Safe Auto Fish Loaded",Content="Fallback version ready",Duration=5})
+print("🎣 Safe Auto Fish v4.5 Loaded!")
