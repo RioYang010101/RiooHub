@@ -485,7 +485,7 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "🎣 Auto Fish V4.0",
+    Name = "🎣 RiooHub V1.0",
     LoadingTitle = "Ultra-Fast Fishing",
     LoadingSubtitle = "Working Method Implementation",
     ConfigurationSaving = {
@@ -494,7 +494,7 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- ====== MAIN TAB ======
-local MainTab = Window:CreateTab("🏠 Main", 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
 
 MainTab:CreateSection("Auto Fishing")
 
@@ -569,6 +569,36 @@ MainTab:CreateInput({
     end
 })
 
+MainTab:CreateSection("Auto Favorite")
+
+local AutoFavoriteToggle = MainTab:CreateToggle({
+    Name = "⭐ Auto Favorite Fish",
+    CurrentValue = Config.AutoFavorite,
+    Callback = function(value)
+        Config.AutoFavorite = value
+        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
+        saveConfig()
+    end
+})
+
+local FavoriteRarityDropdown = MainTab:CreateDropdown({
+    Name = "Favorite Rarity (Mythic/Secret Only)",
+    Options = {"Mythic", "Secret"},
+    CurrentOption = Config.FavoriteRarity,
+    Callback = function(option)
+        Config.FavoriteRarity = option
+        print("[Config] Favorite rarity set to: " .. option .. "+")
+        saveConfig()
+    end
+})
+
+MainTab:CreateButton({
+    Name = "⭐ Favorite All Mythic/Secret Now",
+    Callback = function()
+        autoFavoriteByRarity()
+    end
+})
+
 MainTab:CreateSection("Auto Sell")
 
 local AutoSellToggle = MainTab:CreateToggle({
@@ -605,7 +635,7 @@ MainTab:CreateButton({
 })
 
 -- ====== TELEPORT TAB (from dev1.lua) ======
-local TeleportTab = Window:CreateTab("🌍 Teleport", nil)
+local TeleportTab = Window:CreateTab("Teleport", nil)
 
 TeleportTab:CreateSection("📍 Locations")
 
@@ -619,7 +649,7 @@ for locationName, _ in pairs(LOCATIONS) do
 end
 
 -- ====== SETTINGS TAB ======
-local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
 SettingsTab:CreateSection("Performance")
 
@@ -637,38 +667,8 @@ local GPUToggle = SettingsTab:CreateToggle({
     end
 })
 
-SettingsTab:CreateSection("Auto Favorite")
-
-local AutoFavoriteToggle = SettingsTab:CreateToggle({
-    Name = "⭐ Auto Favorite Fish",
-    CurrentValue = Config.AutoFavorite,
-    Callback = function(value)
-        Config.AutoFavorite = value
-        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
-
-local FavoriteRarityDropdown = SettingsTab:CreateDropdown({
-    Name = "Favorite Rarity (Mythic/Secret Only)",
-    Options = {"Mythic", "Secret"},
-    CurrentOption = Config.FavoriteRarity,
-    Callback = function(option)
-        Config.FavoriteRarity = option
-        print("[Config] Favorite rarity set to: " .. option .. "+")
-        saveConfig()
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "⭐ Favorite All Mythic/Secret Now",
-    Callback = function()
-        autoFavoriteByRarity()
-    end
-})
-
 -- ====== INFO TAB ======
-local InfoTab = Window:CreateTab("ℹ️ Info", 4483362458)
+local InfoTab = Window:CreateTab("Info", 4483362458)
 
 InfoTab:CreateParagraph({
     Title = "Features",
@@ -710,8 +710,8 @@ Rayfield:Notify({
     Image = 4483362458
 })
 
-print("🎣 Auto Fish V4.0 - Loaded!")
+print("🎣 RiooHub V1.0 - Loaded!")
 print("✅ Using YOUR working fishing method")
 print("✅ Blatant Mode available")
-print("✅ Teleport system from dev1.lua integrated")
+print("✅ Teleport system from script.lua integrated")
 print("Ready to fish!")
