@@ -1,5 +1,5 @@
 -- ====================================================================
---                 AUTO FISH V4.3 - SAFE REQUIRE & MULTI-RARITY
+--                 AUTO FISH V4.4 - SAFE REQUIRE + MULTI-RARITY
 -- ====================================================================
 
 -- ====== CORE SERVICES ======
@@ -25,11 +25,11 @@ local DefaultConfig = {
     SellDelay = 30,
     TeleportLocation = "Sisyphus Statue",
     AutoFavorite = false,
-    FavoriteRarities = {"Mythic", "Secret"}
+    FavoriteRarities = {"Mythic","Secret"} -- default selected
 }
 
 local Config = {}
-for k, v in pairs(DefaultConfig) do Config[k] = v end
+for k,v in pairs(DefaultConfig) do Config[k]=v end
 
 -- ====== CONFIG FUNCTIONS ======
 local function ensureFolder()
@@ -48,8 +48,8 @@ end
 local function loadConfig()
     if not readfile or not isfile or not isfile(CONFIG_FILE) then return end
     pcall(function()
-        local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
-        for k,v in pairs(data) do if DefaultConfig[k] ~= nil then Config[k]=v end end
+        local data=HttpService:JSONDecode(readfile(CONFIG_FILE))
+        for k,v in pairs(data) do if DefaultConfig[k]~=nil then Config[k]=v end end
     end)
 end
 
@@ -63,9 +63,20 @@ local LOCATIONS = {
 }
 
 -- ====== NETWORK EVENTS ======
-local netModule = ReplicatedStorage:FindFirstChild("Packages") and ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
-if not netModule then warn("[Auto Fish] Net module not found") return end
-local net = require(netModule).net
+local net
+do
+    local success, module = pcall(function()
+        local Packages = ReplicatedStorage:FindFirstChild("Packages")
+        local netModule = Packages and Packages:FindFirstChild("_Index") and Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
+        if netModule then return require(netModule).net end
+    end)
+    if success then net=module else warn("[Auto Fish] Net module not loaded") end
+end
+
+if not net then
+    warn("[Auto Fish] Cannot continue without net module")
+    return
+end
 
 local Events = {
     fishing = net:WaitForChild("RE/FishingCompleted"),
@@ -79,45 +90,40 @@ local Events = {
 
 -- ====== SAFE MODULE REQUIRE ======
 local ItemUtility, Replion, PlayerData
+do
+    -- ItemUtility
+    local s, r = pcall(function()
+        local module = ReplicatedStorage:FindFirstChild("Shared") and ReplicatedStorage.Shared:FindFirstChild("ItemUtility")
+        if module then return require(module) end
+    end)
+    if s then ItemUtility = r else warn("ItemUtility module not found") end
 
--- ItemUtility
-local Shared = ReplicatedStorage:FindFirstChild("Shared")
-if Shared then
-    local module = Shared:FindFirstChild("ItemUtility")
-    if module and module:IsA("ModuleScript") then
-        local s,r = pcall(require,module)
-        if s then ItemUtility=r else warn("Failed to require ItemUtility") end
-    else warn("ItemUtility module not found") end
-else warn("Shared folder not found") end
-
--- Replion & PlayerData
-local Packages = ReplicatedStorage:FindFirstChild("Packages")
-if Packages then
-    local module = Packages:FindFirstChild("Replion")
-    if module and module:IsA("ModuleScript") then
-        local s,r = pcall(require,module)
-        if s then 
-            Replion=r
-            if Replion.Client then PlayerData=Replion.Client:WaitReplion("Data") end
-        else warn("Failed to require Replion") end
-    else warn("Replion module not found") end
-else warn("Packages folder not found") end
+    -- Replion & PlayerData
+    s,r = pcall(function()
+        local module = ReplicatedStorage:FindFirstChild("Packages") and ReplicatedStorage.Packages:FindFirstChild("Replion")
+        if module then return require(module) end
+    end)
+    if s and r and r.Client then
+        Replion=r
+        PlayerData=r.Client:WaitReplion("Data")
+    else warn("Replion module not loaded") end
+end
 
 -- ====== RARITY SYSTEM ======
-local RarityTiers = {Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,Secret=7}
+local RarityTiers={Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,Secret=7}
 local function getRarityValue(r) return RarityTiers[r] or 0 end
 local function getFishRarity(itemData) if not itemData or not itemData.Data then return "Common" end return itemData.Data.Rarity or "Common" end
 
--- ====== TELEPORT FUNCTION ======
-local Teleport = {}
-function Teleport.to(locationName)
-    local cframe = LOCATIONS[locationName]
-    if not cframe then warn("Location not found: "..tostring(locationName)) return false end
+-- ====== TELEPORT ======
+local Teleport={}
+function Teleport.to(loc)
+    local cf=LOCATIONS[loc]
+    if not cf then warn("Location not found: "..tostring(loc)) return end
     pcall(function()
         local char = LocalPlayer.Character
         if char then
             local root = char:FindFirstChild("HumanoidRootPart")
-            if root then root.CFrame = cframe end
+            if root then root.CFrame=cf end
         end
     end)
 end
@@ -175,7 +181,7 @@ end)
 local favoritedItems={}
 local function isItemFavorited(uuid)
     local success,result=pcall(function()
-        local items = PlayerData and PlayerData:GetExpect("Inventory").Items
+        local items=PlayerData and PlayerData:GetExpect("Inventory").Items
         if not items then return false end
         for _,i in ipairs(items) do if i.UUID==uuid then return i.Favorited==true end end
         return false
@@ -186,21 +192,16 @@ end
 local function autoFavoriteByRarity()
     if not Config.AutoFavorite or not PlayerData or not ItemUtility then return end
     local targetRarities=Config.FavoriteRarities
-    local favorited=0
-    pcall(function()
-        local items=PlayerData:GetExpect("Inventory").Items
-        if not items then return end
-        for _,item in ipairs(items) do
-            local data=ItemUtility:GetItemData(item.Id)
-            if data and data.Data then
-                local rarity=getFishRarity(data)
-                if table.find(targetRarities,rarity) and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
-                    Events.favorite:FireServer(item.UUID)
-                    favoritedItems[item.UUID]=true
-                end
+    for _,item in ipairs(PlayerData:GetExpect("Inventory").Items or {}) do
+        local data=ItemUtility:GetItemData(item.Id)
+        if data and data.Data then
+            local rarity=getFishRarity(data)
+            if table.find(targetRarities,rarity) and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
+                pcall(function() Events.favorite:FireServer(item.UUID) end)
+                favoritedItems[item.UUID]=true
             end
         end
-    end)
+    end
 end
 task.spawn(function()
     while true do
@@ -222,35 +223,20 @@ local function castRod()
         Events.minigame:InvokeServer(1.2854545116425,1)
     end)
 end
-
-local function reelIn()
-    pcall(function()
-        Events.fishing:FireServer()
-    end)
-end
+local function reelIn() pcall(function() Events.fishing:FireServer() end) end
 
 local function blatantFishingLoop()
     while fishingActive and Config.BlatantMode do
         if not isFishing then
             isFishing=true
-            task.spawn(function()
-                Events.charge:InvokeServer(1755848498.4834)
-                task.wait(0.01)
-                Events.minigame:InvokeServer(1.2854545116425,1)
-            end)
+            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
             task.wait(0.05)
-            task.spawn(function()
-                Events.charge:InvokeServer(1755848498.4834)
-                task.wait(0.01)
-                Events.minigame:InvokeServer(1.2854545116425,1)
-            end)
+            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
             task.wait(Config.FishDelay)
             for i=1,5 do pcall(function() Events.fishing:FireServer() end) task.wait(0.01) end
             task.wait(Config.CatchDelay*0.5)
             isFishing=false
-        else
-            task.wait(0.01)
-        end
+        else task.wait(0.01) end
     end
 end
 
@@ -285,9 +271,7 @@ task.spawn(function()
 end)
 
 -- ====== AUTO SELL ======
-local function simpleSell()
-    pcall(function() Events.sell:InvokeServer() end)
-end
+local function simpleSell() pcall(function() Events.sell:InvokeServer() end) end
 task.spawn(function()
     while true do
         task.wait(Config.SellDelay)
@@ -297,7 +281,7 @@ end)
 
 -- ====== RAYFIELD UI ======
 local Rayfield=loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Window=Rayfield:CreateWindow({Name="🎣 RiooHub V4.3",LoadingTitle="Auto Fish",LoadingSubtitle="Safe Require + Multi-Rarity",ConfigurationSaving={Enabled=false}})
+local Window=Rayfield:CreateWindow({Name="🎣 RiooHub V4.4",LoadingTitle="Auto Fish",LoadingSubtitle="Safe Require + Multi-Rarity",ConfigurationSaving={Enabled=false}})
 
 -- MAIN TAB
 local MainTab=Window:CreateTab("Main",4483362458)
@@ -331,4 +315,4 @@ InfoTab:CreateParagraph({Title="Features",Content=[[• Auto Fish with Blatant M
 • Teleport System]]})
 
 Rayfield:Notify({Title="Auto Fish Loaded",Content="Safe Require + Multi-Rarity Enabled",Duration=5})
-print("🎣 RiooHub V4.3 Loaded!")
+print("🎣 RiooHub V4.4 Loaded!")
