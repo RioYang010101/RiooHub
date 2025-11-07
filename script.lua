@@ -1,5 +1,5 @@
 -- ====================================================================
---                 AUTO FISH V4.1 - RAYFIELD UI EDITION
+--                 AUTO FISH V4.2 - RAYFIELD UI EDITION (SAFE REQUIRE)
 -- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
@@ -69,12 +69,12 @@ for k, v in pairs(DefaultConfig) do Config[k] = v end
 --                     TELEPORT LOCATIONS
 -- ====================================================================
 local LOCATIONS = {
-    ["Spawn"] = CFrame.new(45.2788, 252.562, 2987.109, 1,0,0,0,1,0,0,0,1),
-    ["Sisyphus Statue"] = CFrame.new(-3728.216, -135.074, -1012.127, -0.977,0,-0.212,0,1,0,0.212,0,-0.977),
-    ["Coral Reefs"] = CFrame.new(-3114.78, 1.32, 2237.52, -0.304,0,-0.952,0,1,0,0.952,0,-0.304),
-    ["Esoteric Depths"] = CFrame.new(3248.37, -1301.53, 1403.82, -0.920,0,0.391,0,1,0,-0.391,0,-0.920),
-    ["Crater Island"] = CFrame.new(1016.49, 20.09, 5069.27, 0.838,0,-0.544,0,1,0,0.544,0,0.838),
-    ["Lost Isle"] = CFrame.new(-3618.15, 240.83, -1317.45,1,0,0,0,1,0,0,0,1)
+    ["Spawn"] = CFrame.new(45.2788, 252.562, 2987.109),
+    ["Sisyphus Statue"] = CFrame.new(-3728.216, -135.074, -1012.127),
+    ["Coral Reefs"] = CFrame.new(-3114.78, 1.32, 2237.52),
+    ["Esoteric Depths"] = CFrame.new(3248.37, -1301.53, 1403.82),
+    ["Crater Island"] = CFrame.new(1016.49, 20.09, 5069.27),
+    ["Lost Isle"] = CFrame.new(-3618.15, 240.83, -1317.45)
 }
 
 -- ====================================================================
@@ -128,27 +128,31 @@ local Events = {
 }
 
 -- ====================================================================
---                     MODULES FOR AUTO FAVORITE
+--                     SAFE MODULE REQUIRE
 -- ====================================================================
-local ItemUtility = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ItemUtility"))
-local Replion = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Replion"))
-local PlayerData = Replion.Client:WaitReplion("Data")
+local function safeRequire(path)
+    if not path then return nil end
+    local success, result = pcall(require, path)
+    if success then return result else warn("[Auto Fish] Failed to require: "..tostring(path)) return nil end
+end
+
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
+local ItemUtility = Shared and safeRequire(Shared:FindFirstChild("ItemUtility"))
+
+local Packages = ReplicatedStorage:FindFirstChild("Packages")
+local Replion = Packages and safeRequire(Packages:FindFirstChild("Replion"))
+local PlayerData = Replion and Replion.Client:WaitReplion("Data")
+
+if not ItemUtility then warn("[Auto Fish] ItemUtility module missing") end
+if not Replion then warn("[Auto Fish] Replion module missing") end
+if not PlayerData then warn("[Auto Fish] PlayerData missing") end
 
 -- ====================================================================
 --                     RARITY SYSTEM
 -- ====================================================================
-local RarityTiers = {
-    Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Secret = 7
-}
-
-local function getRarityValue(rarity)
-    return RarityTiers[rarity] or 0
-end
-
-local function getFishRarity(itemData)
-    if not itemData or not itemData.Data then return "Common" end
-    return itemData.Data.Rarity or "Common"
-end
+local RarityTiers = {Common=1,Uncommon=2,Rare=3,Epic=4,Legendary=5,Mythic=6,Secret=7}
+local function getRarityValue(rarity) return RarityTiers[rarity] or 0 end
+local function getFishRarity(itemData) if not itemData or not itemData.Data then return "Common" end return itemData.Data.Rarity or "Common" end
 
 -- ====================================================================
 --                     TELEPORT SYSTEM
@@ -170,14 +174,12 @@ end
 -- ====================================================================
 --                     GPU SAVER
 -- ====================================================================
-local gpuActive = false
-local whiteScreen = nil
+local gpuActive=false
+local whiteScreen=nil
 local function enableGPU()
-    if gpuActive then return end
-    gpuActive=true
+    if gpuActive then return end gpuActive=true
     pcall(function() settings().Rendering.QualityLevel=Enum.QualityLevel.Level01 game.Lighting.GlobalShadows=false game.Lighting.FogEnd=1 setfpscap(8) end)
-    whiteScreen = Instance.new("ScreenGui")
-    whiteScreen.ResetOnSpawn=false whiteScreen.DisplayOrder=999999
+    whiteScreen=Instance.new("ScreenGui") whiteScreen.ResetOnSpawn=false whiteScreen.DisplayOrder=999999
     local frame=Instance.new("Frame") frame.Size=UDim2.new(1,0,1,0) frame.BackgroundColor3=Color3.new(0.1,0.1,0.1) frame.Parent=whiteScreen
     local label=Instance.new("TextLabel") label.Size=UDim2.new(0,400,0,100) label.Position=UDim2.new(0.5,-200,0.5,-50)
     label.BackgroundTransparency=1 label.Text="🟢 GPU SAVER ACTIVE\nAuto Fish Running..." label.TextColor3=Color3.new(0,1,0)
@@ -193,17 +195,16 @@ end
 -- ====================================================================
 --                     ANTI-AFK
 -- ====================================================================
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new())
-end)
+LocalPlayer.Idled:Connect(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
 
 -- ====================================================================
 --                     AUTO FAVORITE MULTI-RARITY
 -- ====================================================================
-local favoritedItems = {}
+local favoritedItems={}
 local function isItemFavorited(uuid)
-    local success,result = pcall(function()
-        local items = PlayerData:GetExpect("Inventory").Items
+    local success,result=pcall(function()
+        local items = PlayerData and PlayerData:GetExpect("Inventory").Items
+        if not items then return false end
         for _, item in ipairs(items) do if item.UUID==uuid then return item.Favorited==true end end
         return false
     end)
@@ -211,17 +212,17 @@ local function isItemFavorited(uuid)
 end
 
 local function autoFavoriteByRarity()
-    if not Config.AutoFavorite then return end
-    local targetRarities = Config.FavoriteRarities
+    if not Config.AutoFavorite or not PlayerData or not ItemUtility then return end
+    local targetRarities=Config.FavoriteRarities
     local favorited=0
     pcall(function()
         local items = PlayerData:GetExpect("Inventory").Items
         if not items then return end
         for _,item in ipairs(items) do
-            local data = ItemUtility:GetItemData(item.Id)
+            local data=ItemUtility:GetItemData(item.Id)
             if data and data.Data then
                 local rarity=getFishRarity(data)
-                if table.find(targetRarities, rarity) and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
+                if table.find(targetRarities,rarity) and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
                     Events.favorite:FireServer(item.UUID)
                     favoritedItems[item.UUID]=true
                     favorited=favorited+1
@@ -238,59 +239,26 @@ task.spawn(function() while true do task.wait(10) if Config.AutoFavorite then au
 local isFishing=false fishingActive=false
 local function castRod() pcall(function() Events.equip:FireServer(1) task.wait(0.05) Events.charge:InvokeServer(1755848498.4834) task.wait(0.02) Events.minigame:InvokeServer(1.2854545116425,1) end) end
 local function reelIn() pcall(function() Events.fishing:FireServer() end) end
-
-local function blatantFishingLoop()
-    while fishingActive and Config.BlatantMode do
-        if not isFishing then isFishing=true
-            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
-            task.wait(0.05)
-            task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end)
-            task.wait(Config.FishDelay)
-            for i=1,5 do pcall(function() Events.fishing:FireServer() end) task.wait(0.01) end
-            task.wait(Config.CatchDelay*0.5)
-            isFishing=false
-        else task.wait(0.01) end
-    end
-end
-
-local function normalFishingLoop()
-    while fishingActive and not Config.BlatantMode do
-        if not isFishing then isFishing=true castRod() task.wait(Config.FishDelay) reelIn() task.wait(Config.CatchDelay) isFishing=false else task.wait(0.1) end
-    end
-end
-
-local function fishingLoop()
-    while fishingActive do
-        if Config.BlatantMode then blatantFishingLoop() else normalFishingLoop() end
-        task.wait(0.1)
-    end
-end
+local function blatantFishingLoop() while fishingActive and Config.BlatantMode do if not isFishing then isFishing=true task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end) task.wait(0.05) task.spawn(function() Events.charge:InvokeServer(1755848498.4834) task.wait(0.01) Events.minigame:InvokeServer(1.2854545116425,1) end) task.wait(Config.FishDelay) for i=1,5 do pcall(function() Events.fishing:FireServer() end) task.wait(0.01) end task.wait(Config.CatchDelay*0.5) isFishing=false else task.wait(0.01) end end end
+local function normalFishingLoop() while fishingActive and not Config.BlatantMode do if not isFishing then isFishing=true castRod() task.wait(Config.FishDelay) reelIn() task.wait(Config.CatchDelay) isFishing=false else task.wait(0.1) end end end
+local function fishingLoop() while fishingActive do if Config.BlatantMode then blatantFishingLoop() else normalFishingLoop() end task.wait(0.1) end end
 
 -- ====================================================================
 --                     AUTO CATCH
 -- ====================================================================
-task.spawn(function()
-    while true do
-        if Config.AutoCatch and not isFishing then
-            pcall(function() Events.fishing:FireServer() end)
-        end
-        task.wait(Config.CatchDelay)
-    end
-end)
+task.spawn(function() while true do if Config.AutoCatch and not isFishing then pcall(function() Events.fishing:FireServer() end) end task.wait(Config.CatchDelay) end end)
 
 -- ====================================================================
 --                     AUTO SELL
 -- ====================================================================
-local function simpleSell()
-    pcall(function() Events.sell:InvokeServer() end)
-end
+local function simpleSell() pcall(function() Events.sell:InvokeServer() end) end
 task.spawn(function() while true do task.wait(Config.SellDelay) if Config.AutoSell then simpleSell() end end end)
 
 -- ====================================================================
 --                     RAYFIELD UI
 -- ====================================================================
 local Rayfield=loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local Window=Rayfield:CreateWindow({Name="🎣 RiooHub V1.1",LoadingTitle="Ultra-Fast Fishing",LoadingSubtitle="v4.1 Multi-Rarity",ConfigurationSaving={Enabled=false}})
+local Window=Rayfield:CreateWindow({Name="🎣 RiooHub V4.2",LoadingTitle="Ultra-Fast Fishing",LoadingSubtitle="v4.2 Safe Require",ConfigurationSaving={Enabled=false}})
 
 -- ===== MAIN TAB =====
 local MainTab=Window:CreateTab("Main",4483362458)
@@ -323,7 +291,5 @@ InfoTab:CreateParagraph({Title="Features",Content=[[• Auto Fish with Blatant M
 • Anti-AFK
 • Teleport System]]})
 
--- Notify
 Rayfield:Notify({Title="Auto Fish Loaded",Content="Ready to fish!",Duration=5})
-
-print("🎣 RiooHub V1.1 Loaded!")
+print("🎣 RiooHub V4.2 Loaded! Safe Require Enabled ✅")
