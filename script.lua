@@ -1,5 +1,5 @@
 -- ====================================================================
---                 RiooHub V1.0 - RAYFIELD UI EDITION
+--                 RiooHub V1.0.0 - RAYFIELD UI EDITION
 -- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
@@ -489,7 +489,7 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "🎣 RiooHub V1.0",
+    Name = "🎣 RiooHub V1.0.0",
     LoadingTitle = "RiooHub - Fish It",
     LoadingSubtitle = "Working Method Implementation",
     ConfigurationSaving = {
@@ -672,7 +672,7 @@ for _, rarity in ipairs(rarityList) do
 end
 
 -- ====== TELEPORT TAB ======
-local TeleportTab = Window:CreateTab("Teleport", nil)
+local TeleportTab = Window:CreateTab("Teleport", 4483362458)
 
 TeleportTab:CreateSection("📍 Locations")
 
@@ -747,7 +747,7 @@ Rayfield:Notify({
     Image = 4483362458
 })
 
-print("🎣 RiooHub V1.0 - Loaded!")
+print("🎣 RiooHub V1.0.0 - Loaded!")
 print("✅ Using YOUR working fishing method")
 print("✅ Blatant Mode available")
 print("✅ Teleport system from dev1.lua integrated")
