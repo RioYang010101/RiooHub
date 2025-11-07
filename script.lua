@@ -661,25 +661,36 @@ local GPUToggle = SettingsTab:CreateToggle({
     end
 })
 
--- ================= AUTO FAVORITE =================
 SettingsTab:CreateSection("Auto Favorite")
-
-local AutoFavoriteToggle = SettingsTab:CreateToggle({
-    Name = "⭐ Auto Favorite Fish",
-    CurrentValue = Config.AutoFavorite,
-    Callback = function(value)
-        Config.AutoFavorite = value
-        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
 
 -- list semua rarity
 local rarityList = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
 -- pastikan Config.FavoriteRarity selalu table
 if type(Config.FavoriteRarity) ~= "table" then
-    Config.FavoriteRarity = {"Mythic"} -- default
+    Config.FavoriteRarity = {} -- default kosong
+end
+
+-- function untuk favorite/unfavorite real-time
+local function updateFavorites()
+    local items = PlayerData:GetExpect("Inventory").Items
+    if not items or #items == 0 then return end
+
+    for _, item in ipairs(items) do
+        local data = ItemUtility:GetItemData(item.Id)
+        if data and data.Data then
+            local rarity = getFishRarity(data)
+            local uuid = item.UUID
+
+            local shouldFavorite = table.find(Config.FavoriteRarity, rarity)
+
+            if shouldFavorite and not favoritedItems[uuid] and not isItemFavorited(uuid) then
+                pcall(function() Events.favorite:FireServer(uuid) end)
+                favoritedItems[uuid] = true
+                print("[Auto Favorite] ⭐ Favorited: " .. (data.Data.Name or "Unknown") .. " (" .. rarity .. ")")
+            end
+        end
+    end
 end
 
 -- buat toggle untuk tiap rarity
@@ -700,19 +711,15 @@ for _, rarity in ipairs(rarityList) do
                     end
                 end
             end
+
             saveConfig()
-            print("[Config] Favorite rarities now: " .. table.concat(Config.FavoriteRarity, ", "))
+            print("[Config] Favorite rarities now: " .. (next(Config.FavoriteRarity) and table.concat(Config.FavoriteRarity, ", ") or "None"))
+
+            -- update favorit langsung
+            task.spawn(updateFavorites)
         end
     })
 end
-
--- tombol manual favorite semua item
-SettingsTab:CreateButton({
-    Name = "⭐ Favorite Selected Rarities Now",
-    Callback = function()
-        autoFavoriteByRarity()
-    end
-})
 
 -- ====== INFO TAB ======
 local InfoTab = Window:CreateTab("ℹ️ Info", 4483362458)
