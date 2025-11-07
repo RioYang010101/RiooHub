@@ -1,6 +1,6 @@
 -- ====================================================================
---                 AUTO FISH V4.0 - RAYFIELD UI EDITION
---          Based on Working test.lua Fishing Method
+--                 AUTO FISH V4.1 - RAYFIELD UI EDITION
+--          FULL COPY-PASTE READY (Multi-Rarity Auto Favorite)
 -- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
@@ -59,8 +59,8 @@ local DefaultConfig = {
     CatchDelay = 0.2,
     SellDelay = 30,
     TeleportLocation = "Sisyphus Statue",
-    AutoFavorite = true,
-    FavoriteRarity = "Mythic"
+    AutoFavorite = false,
+    FavoriteRarity = {"Mythic"} -- Multi-rarity
 }
 
 local Config = {}
@@ -136,7 +136,7 @@ end
 local Events = getNetworkEvents()
 
 -- ====================================================================
---                     MODULES FOR AUTO FAVORITE
+--                     MODULES
 -- ====================================================================
 local ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
 local Replion = require(ReplicatedStorage.Packages.Replion)
@@ -165,28 +165,23 @@ local function getFishRarity(itemData)
 end
 
 -- ====================================================================
---                     TELEPORT SYSTEM (from dev1.lua)
+--                     TELEPORT SYSTEM
 -- ====================================================================
 local Teleport = {}
-
 function Teleport.to(locationName)
     local cframe = LOCATIONS[locationName]
     if not cframe then
         warn("❌ [Teleport] Location not found: " .. tostring(locationName))
         return false
     end
-
     local success = pcall(function()
         local character = LocalPlayer.Character
         if not character then return end
-
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
-
         rootPart.CFrame = cframe
         print("✅ [Teleport] Moved to " .. locationName)
     end)
-
     return success
 end
 
@@ -199,34 +194,29 @@ local whiteScreen = nil
 local function enableGPU()
     if gpuActive then return end
     gpuActive = true
-
     pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         game.Lighting.GlobalShadows = false
         game.Lighting.FogEnd = 1
         setfpscap(8)
     end)
-
     whiteScreen = Instance.new("ScreenGui")
     whiteScreen.ResetOnSpawn = false
     whiteScreen.DisplayOrder = 999999
-
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    frame.Size = UDim2.new(1,0,1,0)
+    frame.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
     frame.Parent = whiteScreen
-
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 400, 0, 100)
-    label.Position = UDim2.new(0.5, -200, 0.5, -50)
+    label.Size = UDim2.new(0,400,0,100)
+    label.Position = UDim2.new(0.5,-200,0.5,-50)
     label.BackgroundTransparency = 1
     label.Text = "🟢 GPU SAVER ACTIVE\n\nAuto Fish Running..."
-    label.TextColor3 = Color3.new(0, 1, 0)
+    label.TextColor3 = Color3.new(0,1,0)
     label.TextSize = 28
     label.Font = Enum.Font.GothamBold
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.Parent = frame
-
     whiteScreen.Parent = game.CoreGui
     print("[GPU] GPU Saver enabled")
 end
@@ -234,18 +224,13 @@ end
 local function disableGPU()
     if not gpuActive then return end
     gpuActive = false
-
     pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
         game.Lighting.GlobalShadows = true
         game.Lighting.FogEnd = 100000
         setfpscap(0)
     end)
-
-    if whiteScreen then
-        whiteScreen:Destroy()
-        whiteScreen = nil
-    end
+    if whiteScreen then whiteScreen:Destroy() whiteScreen = nil end
     print("[GPU] GPU Saver disabled")
 end
 
@@ -256,95 +241,21 @@ LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
-
 print("[Anti-AFK] Protection enabled")
 
 -- ====================================================================
---                     AUTO FAVORITE
--- ====================================================================
-local favoritedItems = {}
-
-local function isItemFavorited(uuid)
-    local success, result = pcall(function()
-        local items = PlayerData:GetExpect("Inventory").Items
-        for _, item in ipairs(items) do
-            if item.UUID == uuid then
-                return item.Favorited == true
-            end
-        end
-        return false
-    end)
-    return success and result or false
-end
-
-local function autoFavoriteByRarity()
-    if not Config.AutoFavorite then return end
-
-    local targetRarity = Config.FavoriteRarity
-    local targetValue = getRarityValue(targetRarity)
-
-    if targetValue < 6 then
-        targetValue = 6
-    end
-
-    local favorited = 0
-    local skipped = 0
-
-    local success = pcall(function()
-        local items = PlayerData:GetExpect("Inventory").Items
-
-        if not items or #items == 0 then return end
-
-        for i, item in ipairs(items) do
-            local data = ItemUtility:GetItemData(item.Id)
-            if data and data.Data then
-                local itemName = data.Data.Name or "Unknown"
-                local rarity = getFishRarity(data)
-                local rarityValue = getRarityValue(rarity)
-
-                if rarityValue >= targetValue and rarityValue >= 6 then
-                    if not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
-                        Events.favorite:FireServer(item.UUID)
-                        favoritedItems[item.UUID] = true
-                        favorited = favorited + 1
-                        print("[Auto Favorite] ⭐ #" .. favorited .. " - " .. itemName .. " (" .. rarity .. ")")
-                        task.wait(0.3)
-                    else
-                        skipped = skipped + 1
-                    end
-                end
-            end
-        end
-    end)
-
-    if favorited > 0 then
-        print("[Auto Favorite] ✅ Complete! Favorited: " .. favorited)
-    end
-end
-
-task.spawn(function()
-    while true do
-        task.wait(10)
-        if Config.AutoFavorite then
-            autoFavoriteByRarity()
-        end
-    end
-end)
-
--- ====================================================================
---                     FISHING LOGIC (FROM YOUR test.lua)
+--                     FISHING LOGIC
 -- ====================================================================
 local isFishing = false
 local fishingActive = false
 
--- Helper functions
 local function castRod()
     pcall(function()
         Events.equip:FireServer(1)
         task.wait(0.05)
         Events.charge:InvokeServer(1755848498.4834)
         task.wait(0.02)
-        Events.minigame:InvokeServer(1.2854545116425, 1)
+        Events.minigame:InvokeServer(1.2854545116425,1)
         print("[Fishing] 🎣 Cast")
     end)
 end
@@ -356,48 +267,28 @@ local function reelIn()
     end)
 end
 
--- BLATANT MODE: Your exact implementation
 local function blatantFishingLoop()
     while fishingActive and Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
-            -- Step 1: Rapid fire casts (2 parallel casts)
             pcall(function()
                 Events.equip:FireServer(1)
                 task.wait(0.01)
-
-                -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                    Events.minigame:InvokeServer(1.2854545116425,1)
                 end)
-
                 task.wait(0.05)
-
-                -- Cast 2 (overlapping)
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                    Events.minigame:InvokeServer(1.2854545116425,1)
                 end)
             end)
-
-            -- Step 2: Wait for fish to bite
             task.wait(Config.FishDelay)
-
-            -- Step 3: Spam reel 5x to instant catch
-            for i = 1, 5 do
-                pcall(function() 
-                    Events.fishing:FireServer() 
-                end)
-                task.wait(0.01)
-            end
-
-            -- Step 4: Short cooldown (50% faster)
-            task.wait(Config.CatchDelay * 0.5)
-
+            for i=1,5 do pcall(function() Events.fishing:FireServer() end) task.wait(0.01) end
+            task.wait(Config.CatchDelay*0.5)
             isFishing = false
             print("[Blatant] ⚡ Fast cycle")
         else
@@ -406,17 +297,14 @@ local function blatantFishingLoop()
     end
 end
 
--- NORMAL MODE: Your exact implementation
 local function normalFishingLoop()
     while fishingActive and not Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
             castRod()
             task.wait(Config.FishDelay)
             reelIn()
             task.wait(Config.CatchDelay)
-
             isFishing = false
         else
             task.wait(0.1)
@@ -424,7 +312,6 @@ local function normalFishingLoop()
     end
 end
 
--- Main fishing controller
 local function fishingLoop()
     while fishingActive do
         if Config.BlatantMode then
@@ -437,14 +324,12 @@ local function fishingLoop()
 end
 
 -- ====================================================================
---                     AUTO CATCH (SPAM SYSTEM)
+--                     AUTO CATCH
 -- ====================================================================
 task.spawn(function()
     while true do
         if Config.AutoCatch and not isFishing then
-            pcall(function() 
-                Events.fishing:FireServer() 
-            end)
+            pcall(function() Events.fishing:FireServer() end)
         end
         task.wait(Config.CatchDelay)
     end
@@ -456,262 +341,58 @@ end)
 local function simpleSell()
     print("╔═══════════════════════════════════╗")
     print("[Auto Sell] 💰 Selling all non-favorited items...")
-
-    local sellSuccess = pcall(function()
-        return Events.sell:InvokeServer()
-    end)
-
+    local sellSuccess = pcall(function() return Events.sell:InvokeServer() end)
     if sellSuccess then
         print("[Auto Sell] ✅ SOLD! (Favorited fish kept safe)")
-        print("╚═══════════════════════════════════╝")
     else
         warn("[Auto Sell] ❌ Sell failed")
-        print("╚═══════════════════════════════════╝")
     end
+    print("╚═══════════════════════════════════╝")
 end
 
 task.spawn(function()
     while true do
         task.wait(Config.SellDelay)
-        if Config.AutoSell then
-            simpleSell()
-        end
+        if Config.AutoSell then simpleSell() end
     end
 end)
 
 -- ====================================================================
---                     RAYFIELD UI
+--                     AUTO FAVORITE (Multi-Rarity)
 -- ====================================================================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local favoritedItems = {}
 
-local Window = Rayfield:CreateWindow({
-    Name = "🎣 RiooHub V1.0",
-    LoadingTitle = "Ultra-Fast Fishing",
-    LoadingSubtitle = "Working Method Implementation",
-    ConfigurationSaving = {
-        Enabled = false
-    }
-})
-
--- ====== MAIN TAB ======
-local MainTab = Window:CreateTab("Main", 4483362458)
-
-MainTab:CreateSection("Auto Fishing")
-
-local BlatantToggle = MainTab:CreateToggle({
-    Name = "⚡ BLATANT MODE (3x Faster!)",
-    CurrentValue = Config.BlatantMode,
-    Callback = function(value)
-        Config.BlatantMode = value
-        print("[Blatant Mode] " .. (value and "⚡ ENABLED - SUPER FAST!" or "🔴 Disabled - Normal speed"))
-        saveConfig()
-    end
-})
-
-local AutoFishToggle = MainTab:CreateToggle({
-    Name = "🤖 Auto Fish",
-    CurrentValue = Config.AutoFish,
-    Callback = function(value)
-        Config.AutoFish = value
-        fishingActive = value
-
-        if value then
-            print("[Auto Fish] 🟢 Started " .. (Config.BlatantMode and "(BLATANT MODE)" or "(Normal)"))
-            task.spawn(fishingLoop)
-        else
-            print("[Auto Fish] 🔴 Stopped")
-            pcall(function() Events.unequip:FireServer() end)
+local function isItemFavorited(uuid)
+    local success, result = pcall(function()
+        local items = PlayerData:GetExpect("Inventory").Items
+        for _, item in ipairs(items) do
+            if item.UUID == uuid then return item.Favorited == true end
         end
-
-        saveConfig()
-    end
-})
-
-local AutoCatchToggle = MainTab:CreateToggle({
-    Name = "🎯 Auto Catch (Extra Speed)",
-    CurrentValue = Config.AutoCatch,
-    Callback = function(value)
-        Config.AutoCatch = value
-        print("[Auto Catch] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
-
-MainTab:CreateInput({
-    Name = "Fish Delay (seconds)",
-    PlaceholderText = "Default: 0.9",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0.1 and num <= 10 then
-            Config.FishDelay = num
-            print("[Config] ✅ Fish delay set to " .. num .. "s")
-            saveConfig()
-        else
-            warn("[Config] ❌ Invalid delay (must be 0.1-10)")
-        end
-    end
-})
-
-MainTab:CreateInput({
-    Name = "Catch Delay (seconds)",
-    PlaceholderText = "Default: 0.2",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0.1 and num <= 10 then
-            Config.CatchDelay = num
-            print("[Config] ✅ Catch delay set to " .. num .. "s")
-            saveConfig()
-        else
-            warn("[Config] ❌ Invalid delay (must be 0.1-10)")
-        end
-    end
-})
-
-MainTab:CreateSection("Auto Favorite")
-
-local AutoFavoriteToggle = MainTab:CreateToggle({
-    Name = "⭐ Auto Favorite Fish",
-    CurrentValue = Config.AutoFavorite,
-    Callback = function(value)
-        Config.AutoFavorite = value
-        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
-
-local FavoriteRarityDropdown = MainTab:CreateDropdown({
-    Name = "Favorite Rarity (Mythic/Secret Only)",
-    Options = {"Mythic", "Secret"},
-    CurrentOption = Config.FavoriteRarity,
-    Callback = function(option)
-        Config.FavoriteRarity = option
-        print("[Config] Favorite rarity set to: " .. option .. "+")
-        saveConfig()
-    end
-})
-
-MainTab:CreateButton({
-    Name = "⭐ Favorite All Mythic/Secret Now",
-    Callback = function()
-        autoFavoriteByRarity()
-    end
-})
-
-MainTab:CreateSection("Auto Sell")
-
-local AutoSellToggle = MainTab:CreateToggle({
-    Name = "💰 Auto Sell (Keeps Favorited)",
-    CurrentValue = Config.AutoSell,
-    Callback = function(value)
-        Config.AutoSell = value
-        print("[Auto Sell] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
-
-MainTab:CreateInput({
-    Name = "Sell Delay (seconds)",
-    PlaceholderText = "Default: 30",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 10 and num <= 300 then
-            Config.SellDelay = num
-            print("[Config] ✅ Sell delay set to " .. num .. "s")
-            saveConfig()
-        else
-            warn("[Config] ❌ Invalid delay (must be 10-300)")
-        end
-    end
-})
-
-MainTab:CreateButton({
-    Name = "💰 Sell All Now",
-    Callback = function()
-        simpleSell()
-    end
-})
-
--- ====== TELEPORT TAB (from dev1.lua) ======
-local TeleportTab = Window:CreateTab("Teleport", nil)
-
-TeleportTab:CreateSection("📍 Locations")
-
-for locationName, _ in pairs(LOCATIONS) do
-    TeleportTab:CreateButton({
-        Name = locationName,
-        Callback = function()
-            Teleport.to(locationName)
-        end
-    })
+        return false
+    end)
+    return success and result or false
 end
 
--- ====== SETTINGS TAB ======
-local SettingsTab = Window:CreateTab("Settings", 4483362458)
-
-SettingsTab:CreateSection("Performance")
-
-local GPUToggle = SettingsTab:CreateToggle({
-    Name = "🖥️ GPU Saver Mode",
-    CurrentValue = Config.GPUSaver,
-    Callback = function(value)
-        Config.GPUSaver = value
-        if value then
-            enableGPU()
-        else
-            disableGPU()
-        end
-        saveConfig()
-    end
-})
-
--- ====== INFO TAB ======
-local InfoTab = Window:CreateTab("Info", 4483362458)
-
-InfoTab:CreateParagraph({
-    Title = "Features",
-    Content = [[
-• Fast Auto Fishing with BLATANT MODE
-• Simple Auto Sell (keeps favorited fish)
-• Auto Catch for extra speed
-• GPU Saver Mode
-• Anti-AFK Protection
-• Auto Save Configuration
-• Teleport System (dev1.lua method)
-• Auto Favorite (Mythic & Secret only)
-    ]]
-})
-
-InfoTab:CreateParagraph({
-    Title = "Blatant Mode Explained",
-    Content = [[
-⚡ BLATANT MODE METHOD:
-- Casts 2 rods in parallel (overlapping)
-- Same wait time for fish to bite
-- Spams reel 5x to instant catch
-- 50% faster cooldown between casts
-- Result: ~40% faster fishing!
-
-How it's faster:
-✓ Multiple casts = higher catch rate
-✓ Spam reeling = instant catch
-✓ Reduced cooldown = faster cycles
-✗ Same fish delay (fish needs time!)
-    ]]
-})
-
--- ====== STARTUP ======
-Rayfield:Notify({
-    Title = "Auto Fish Loaded",
-    Content = "Ready to fish!",
-    Duration = 5,
-    Image = 4483362458
-})
-
-print("🎣 RiooHub V1.0 - Loaded!")
-print("✅ Using YOUR working fishing method")
-print("✅ Blatant Mode available")
-print("✅ Teleport system from script.lua integrated")
-print("Ready to fish!")
+local function autoFavoriteByRarity()
+    if not Config.AutoFavorite then return end
+    local targetRarities = Config.FavoriteRarity
+    if #targetRarities == 0 then return end
+    local favorited = 0
+    pcall(function()
+        local items = PlayerData:GetExpect("Inventory").Items
+        if not items or #items == 0 then return end
+        for _, item in ipairs(items) do
+            local data = ItemUtility:GetItemData(item.Id)
+            if data and data.Data then
+                local itemName = data.Data.Name or "Unknown"
+                local rarity = getFishRarity(data)
+                local shouldFavorite = false
+                for _, r in ipairs(targetRarities) do if rarity == r then shouldFavorite = true break end end
+                if shouldFavorite and not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
+                    Events.favorite:FireServer(item.UUID)
+                    favoritedItems[item.UUID] = true
+                    favorited = favorited + 1
+                    print("[Auto Favorite] ⭐ #" .. favorited .. " - " .. itemName .. " (" .. rarity .. ")")
+                    task.wait(0.3)
+                end
+            end
