@@ -338,10 +338,28 @@ end)
 -- ====================================================================
 --                     FISHING - V1
 -- ====================================================================
+-- SERVICES
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- GLOBAL TOGGLES
+getgenv().AutoFishV1 = false
+getgenv().AutoFishV2 = false
+getgenv().AutoPerfectCastV2 = false
+
+-- CONFIG DELAY
+local FISHING_DELAY = 0.1
+local AUTO_CATCH_DELAY = 0.1
+local PERFECT_CAST_WINDOW = 0.2
+
+-- =========================================
+-- V1 SETUP (Events)
+-- =========================================
+local Events = {} -- pastikan Events diisi sesuai script asli kamu
 local isFishing = false
 local fishingActive = false
 
--- Helper functions
 local function castRod()
     pcall(function()
         Events.equip:FireServer(1)
@@ -349,78 +367,57 @@ local function castRod()
         Events.charge:InvokeServer(1755848498.4834)
         task.wait(0.02)
         Events.minigame:InvokeServer(1.2854545116425, 1)
-        print("[Fishing] 🎣 Cast")
+        print("[V1] 🎣 Cast")
     end)
 end
 
 local function reelIn()
     pcall(function()
         Events.fishing:FireServer()
-        print("[Fishing] ✅ Reel")
+        print("[V1] ✅ Reel")
     end)
 end
 
--- BLATANT MODE: Your exact implementation
 local function blatantFishingLoop()
-    while fishingActive and Config.BlatantMode do
+    while fishingActive and getgenv().AutoFishV1 do
         if not isFishing then
             isFishing = true
-
-            -- Step 1: Rapid fire casts (2 parallel casts)
             pcall(function()
                 Events.equip:FireServer(1)
                 task.wait(0.01)
-
-                -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
-
                 task.wait(0.05)
-
-                -- Cast 2 (overlapping)
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
-
-            -- Step 2: Wait for fish to bite
             task.wait(Config.FishDelay)
-
-            -- Step 3: Spam reel 5x to instant catch
-            for i = 1, 5 do
-                pcall(function() 
-                    Events.fishing:FireServer() 
-                end)
+            for i = 1,5 do
+                pcall(function() Events.fishing:FireServer() end)
                 task.wait(0.01)
             end
-
-            -- Step 4: Short cooldown (50% faster)
             task.wait(Config.CatchDelay * 0.5)
-
             isFishing = false
-            print("[Blatant] ⚡ Fast cycle")
         else
             task.wait(0.01)
         end
     end
 end
 
--- NORMAL MODE: Your exact implementation
 local function normalFishingLoop()
-    while fishingActive and not Config.BlatantMode do
+    while fishingActive and getgenv().AutoFishV1 do
         if not isFishing then
             isFishing = true
-
             castRod()
             task.wait(Config.FishDelay)
             reelIn()
             task.wait(Config.CatchDelay)
-
             isFishing = false
         else
             task.wait(0.1)
@@ -428,9 +425,9 @@ local function normalFishingLoop()
     end
 end
 
--- Main fishing controller
-local function fishingLoop()
-    while fishingActive do
+local function fishingV1Loop()
+    fishingActive = true
+    while getgenv().AutoFishV1 do
         if Config.BlatantMode then
             blatantFishingLoop()
         else
@@ -438,82 +435,63 @@ local function fishingLoop()
         end
         task.wait(0.1)
     end
+    fishingActive = false
 end
 
--- ==================================================
--- FISHING V2
--- ==================================================
-
--- Ambil ReplicatedStorage
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- Coba ambil FishingRemotes dengan aman
-local remotes = ReplicatedStorage:FindFirstChild("FishingRemotes")
-if not remotes then
-    warn("FishingRemotes tidak ditemukan di ReplicatedStorage, AutoFishV2 tidak aktif")
-end
-
--- Global toggles
-getgenv().AutoFishV2 = false
-getgenv().AutoPerfectCastV2 = false
-
--- Delay (sesuaikan script original)
-local FISHING_DELAY = 0.1
-local AUTO_CATCH_DELAY = 0.1
-local PERFECT_CAST_WINDOW = 0.2
-
--- Fungsi helper (tetap sama seperti script asli)
-local function autoCast()
-    if remotes and remotes:FindFirstChild("RequestFishingCast") then
-        pcall(function()
-            remotes.RequestFishingCast:FireServer()
-        end)
+-- =========================================
+-- V2 SETUP (Dynamic Remotes)
+-- =========================================
+local function findRemoteByKeyword(keyword)
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name:lower():find(keyword:lower()) then
+            return obj
+        end
     end
+    return nil
+end
+
+local remoteCast = findRemoteByKeyword("Cast")
+local remoteCatch = findRemoteByKeyword("Catch")
+local remotePerfect = findRemoteByKeyword("PerfectCast")
+
+if not remoteCast or not remoteCatch then
+    warn("[V2] Remote cast atau catch tidak ditemukan, V2 tidak aktif.")
+end
+
+local function autoCast()
+    pcall(function() remoteCast:FireServer() end)
 end
 
 local function autoCatch()
-    if remotes and remotes:FindFirstChild("RequestFishingCatch") then
-        pcall(function()
-            remotes.RequestFishingCatch:FireServer()
-        end)
-    end
+    pcall(function() remoteCatch:FireServer() end)
 end
 
 local function isPerfectCastTime()
-    local player = game:GetService("Players").LocalPlayer
-    local bar = player.PlayerGui:FindFirstChild("FishingUI") and player.PlayerGui.FishingUI:FindFirstChild("Bar")
-    if bar then
-        return math.abs(bar.Position.X.Scale - 0.5) <= PERFECT_CAST_WINDOW
+    local gui = LocalPlayer.PlayerGui:FindFirstChild("FishingUI")
+    if gui and gui:FindFirstChild("Bar") then
+        local barValue = gui.Bar.Position.X.Scale
+        return math.abs(barValue - 0.5) <= PERFECT_CAST_WINDOW
     end
     return false
 end
 
 local function doPerfectCast()
-    if remotes and remotes:FindFirstChild("RequestPerfectCast") then
-        pcall(function()
-            remotes.RequestPerfectCast:FireServer()
-        end)
+    if remotePerfect then
+        pcall(function() remotePerfect:FireServer() end)
     end
 end
 
--- Loop utama AutoFishV2
 local function fishingV2Loop()
-    while getgenv().AutoFishV2 do
+    while getgenv().AutoFishV2 and remoteCast and remoteCatch do
         task.wait(FISHING_DELAY)
-        autoCast()
-
+        pcall(autoCast)
         task.wait(AUTO_CATCH_DELAY)
-        autoCatch()
-
+        pcall(autoCatch)
         if getgenv().AutoPerfectCastV2 and isPerfectCastTime() then
-            doPerfectCast()
+            pcall(doPerfectCast)
         end
     end
 end
-
--- Contoh cara start
--- getgenv().AutoFishV2 = true
--- spawn(fishingV2Loop)
 
 -- ====================================================================
 --                     AUTO CATCH (SPAM SYSTEM)
@@ -587,22 +565,17 @@ local BlatantToggle = MainTab:CreateToggle({
     end
 })
 
+-- =========================================
+-- MENU TOGGLE
+-- =========================================
 local AutoFishV1Toggle = MainTab:CreateToggle({
-    Name = "🤖 Auto Fish V1",
-    CurrentValue = Config.AutoFish,
+    Name = "🎣 Auto Fish V1",
+    CurrentValue = false,
     Callback = function(value)
-        Config.AutoFish = value
-        fishingActive = value
-
+        getgenv().AutoFishV1 = value
         if value then
-            print("[Auto Fish] 🟢 Started " .. (Config.BlatantMode and "(BLATANT MODE)" or "(Normal)"))
-            task.spawn(fishingLoop)
-        else
-            print("[Auto Fish] 🔴 Stopped")
-            pcall(function() Events.unequip:FireServer() end)
+            task.spawn(fishingV1Loop)
         end
-
-        saveConfig()
     end
 })
 
@@ -617,8 +590,8 @@ local AutoFishV2Toggle = MainTab:CreateToggle({
     end
 })
 
-local AutoPerfectV2Toggle =MainTab:CreateToggle({
-    Name = "🎯 Auto Perfect Cast V2",
+local PerfectCastToggle = MainTab:CreateToggle({
+    Name = "🎯 Perfect Cast V2",
     CurrentValue = false,
     Callback = function(value)
         getgenv().AutoPerfectCastV2 = value
