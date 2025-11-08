@@ -614,63 +614,33 @@ local FavoriteTab = Window:CreateTab("Favorite", 4483362458)
 
 FavoriteTab:CreateSection("Auto Favorite")
 
--- list semua rarity
-local rarityList = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
-
--- pastikan Config.FavoriteRarity selalu table
-if type(Config.FavoriteRarity) ~= "table" then
-    Config.FavoriteRarity = {} -- default kosong
-end
-
--- function untuk favorite/unfavorite real-time
-local function updateFavorites()
-    local items = PlayerData:GetExpect("Inventory").Items
-    if not items or #items == 0 then return end
-
-    for _, item in ipairs(items) do
-        local data = ItemUtility:GetItemData(item.Id)
-        if data and data.Data then
-            local rarity = getFishRarity(data)
-            local uuid = item.UUID
-
-            local shouldFavorite = table.find(Config.FavoriteRarity, rarity)
-
-            if shouldFavorite and not favoritedItems[uuid] and not isItemFavorited(uuid) then
-                pcall(function() Events.favorite:FireServer(uuid) end)
-                favoritedItems[uuid] = true
-                print("[Auto Favorite] ⭐ Favorited: " .. (data.Data.Name or "Unknown") .. " (" .. rarity .. ")")
-            end
-        end
+local AutoFavoriteToggle = FavoriteTab:CreateToggle({
+    Name = "⭐ Auto Favorite Fish",
+    CurrentValue = Config.AutoFavorite,
+    Callback = function(value)
+        Config.AutoFavorite = value
+        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
+        saveConfig()
     end
-end
+})
 
--- buat toggle untuk tiap rarity
-for _, rarity in ipairs(rarityList) do
-    FavoriteTab:CreateToggle({
-        Name = "⭐ Favorite " .. rarity,
-        CurrentValue = table.find(Config.FavoriteRarity, rarity) and true or false,
-        Callback = function(value)
-            if value then
-                if not table.find(Config.FavoriteRarity, rarity) then
-                    table.insert(Config.FavoriteRarity, rarity)
-                end
-            else
-                for i, r in ipairs(Config.FavoriteRarity) do
-                    if r == rarity then
-                        table.remove(Config.FavoriteRarity, i)
-                        break
-                    end
-                end
-            end
+local FavoriteRarityDropdown = FavoriteTab:CreateDropdown({
+    Name = "Favorite Rarity (Mythic/Secret Only)",
+    Options = {"Mythic", "Secret"},
+    CurrentOption = Config.FavoriteRarity,
+    Callback = function(option)
+        Config.FavoriteRarity = option
+        print("[Config] Favorite rarity set to: " .. option .. "+")
+        saveConfig()
+    end
+})
 
-            saveConfig()
-            print("[Config] Favorite rarities now: " .. (next(Config.FavoriteRarity) and table.concat(Config.FavoriteRarity, ", ") or "None"))
-
-            -- update favorit langsung
-            task.spawn(updateFavorites)
-        end
-    })
-end
+FavoriteTab:CreateButton({
+    Name = "⭐ Favorite All Mythic/Secret Now",
+    Callback = function()
+        autoFavoriteByRarity()
+    end
+})
 
 -- ====== TELEPORT TAB ======
 local TeleportTab = Window:CreateTab("Teleport", 4483362458)
