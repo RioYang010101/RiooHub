@@ -1,5 +1,5 @@
 -- ====================================================================
---                 FISHING MODULE
+--                 FISHING MODULE (REMOTE EDITION)
 -- ====================================================================
 
 local Fishing = {}
@@ -7,38 +7,62 @@ Fishing.isActive = false
 Fishing.isFishing = false
 Fishing.useBlatantMode = false
 
-local Network = require(script.Parent.network)
+-- ====================================================================
+--                 REMOTE EVENT CONNECTION
+-- ====================================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Cast rod
+-- Ambil folder Remotes di ReplicatedStorage
+local function getRemoteEvents()
+    local remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+    return {
+        fishing = remotes:WaitForChild("FishingCompleted"),
+        sell = remotes:WaitForChild("SellAllItems"),
+        charge = remotes:WaitForChild("ChargeFishingRod"),
+        minigame = remotes:WaitForChild("RequestFishingMinigameStarted"),
+        cancel = remotes:WaitForChild("CancelFishingInputs"),
+        equip = remotes:WaitForChild("EquipToolFromHotbar"),
+        unequip = remotes:WaitForChild("UnequipToolFromHotbar"),
+        favorite = remotes:WaitForChild("FavoriteItem")
+    }
+end
+
+local Events = getRemoteEvents()
+
+-- ====================================================================
+--                 FISHING CORE FUNCTIONS
+-- ====================================================================
+
+-- 🎣 Cast Rod
 local function castRod()
     pcall(function()
-        local Events = Network.Events
         Events.equip:FireServer(1)
         task.wait(0.05)
         Events.charge:InvokeServer(1755848498.4834)
         task.wait(0.02)
         Events.minigame:InvokeServer(1.2854545116425, 1)
-        print("[Fishing] Cast")
+        print("[Fishing] 🎣 Cast")
     end)
 end
 
--- Reel in
+-- 🪝 Reel In
 local function reelIn()
     pcall(function()
-        Network.Events.fishing:FireServer()
-        print("[Fishing] Reel")
+        Events.fishing:FireServer()
+        print("[Fishing] 🪝 Reel")
     end)
 end
 
--- Blatant fishing loop
+-- ====================================================================
+--                 BLATANT MODE LOOP
+-- ====================================================================
 local function blatantLoop(config)
     while Fishing.isActive and Fishing.useBlatantMode do
         if not Fishing.isFishing then
             Fishing.isFishing = true
 
-            local Events = Network.Events
-
-            -- Parallel casts
+            -- Paralel cast dua kali untuk spam auto fish cepat
             pcall(function()
                 Events.equip:FireServer(1)
                 task.wait(0.01)
@@ -58,11 +82,14 @@ local function blatantLoop(config)
                 end)
             end)
 
+            -- Delay casting dan catching
             task.wait(config.FishDelay)
 
-            -- Spam reel
+            -- Spam reel agar cepat dapet ikan
             for i = 1, 5 do
-                pcall(function() Events.fishing:FireServer() end)
+                pcall(function()
+                    Events.fishing:FireServer()
+                end)
                 task.wait(0.01)
             end
 
@@ -74,7 +101,9 @@ local function blatantLoop(config)
     end
 end
 
--- Normal fishing loop
+-- ====================================================================
+--                 NORMAL MODE LOOP
+-- ====================================================================
 local function normalLoop(config)
     while Fishing.isActive and not Fishing.useBlatantMode do
         if not Fishing.isFishing then
@@ -92,14 +121,17 @@ local function normalLoop(config)
     end
 end
 
--- Start fishing
+-- ====================================================================
+--                 START / STOP SYSTEM
+-- ====================================================================
+
 function Fishing.start(config, blatantMode)
     if Fishing.isActive then return end
 
     Fishing.isActive = true
-    Fishing.useBlatantMode = blatantMode
+    Fishing.useBlatantMode = blatantMode or false
 
-    print("[Fishing] Started", blatantMode and "(Blatant)" or "(Normal)")
+    print("[Fishing] ▶️ Started", blatantMode and "(Blatant Mode)" or "(Normal Mode)")
 
     task.spawn(function()
         while Fishing.isActive do
@@ -113,21 +145,22 @@ function Fishing.start(config, blatantMode)
     end)
 end
 
--- Stop fishing
 function Fishing.stop()
     Fishing.isActive = false
     Fishing.isFishing = false
 
     pcall(function()
-        Network.Events.unequip:FireServer()
+        Events.unequip:FireServer()
     end)
 
-    print("[Fishing] Stopped")
+    print("[Fishing] ⏹️ Stopped")
 end
 
--- Toggle blatant mode
 function Fishing.setBlatantMode(enabled)
     Fishing.useBlatantMode = enabled
 end
 
+-- ====================================================================
+--                 RETURN MODULE
+-- ====================================================================
 return Fishing
