@@ -1,40 +1,6 @@
--- ============================================================
--- Safe Loader for RiooHub (anti crash + GitHub rate limit)
--- ============================================================
-
-local url = "https://raw.githubusercontent.com/RioYang010101/RiooHub/refs/heads/main/script.lua"
-
-local success, response = pcall(function()
-    return game:HttpGet(url)
-end)
-
-if success and type(response) == "string" and #response > 0 then
-    local loaded, loadErr = loadstring(response)
-    if loaded then
-        print("[RiooHub] ✅ Loaded successfully!")
-        pcall(loaded)
-    else
-        warn("[RiooHub] ⚠️ Script found but failed to compile:", loadErr)
-        if Rayfield and Rayfield.Notify then
-            Rayfield:Notify({
-                Title = "Load Error",
-                Content = "Script ditemukan tapi gagal dijalankan.\nCek isi file RiooHub/script.lua.",
-                Duration = 5
-            })
-        end
-    end
-else
-    warn("[RiooHub] ❌ Failed to fetch script. GitHub may be rate limited or offline.")
-    if Rayfield and Rayfield.Notify then
-        Rayfield:Notify({
-            Title = "GitHub Limit",
-            Content = "Server GitHub sedang sibuk / limit (HTTP 429).\nCoba lagi beberapa menit lagi.",
-            Duration = 7
-        })
-    else
-        print("[RiooHub] GitHub mungkin sedang limit, coba lagi nanti.")
-    end
-end
+-- ====================================================================
+--                 RiooHub V1.0.0 - RAYFIELD UI EDITION
+-- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
 local success, errorMsg = pcall(function()
@@ -94,7 +60,7 @@ local DefaultConfig = {
     SellDelay = 30,
     TeleportLocation = "Sisyphus Statue",
     AutoFavorite = false,
-    FavoriteRarity = {"Mythic"} -- default now a table for multi-select
+    FavoriteRarity = "Mythic"
 }
 
 local Config = {}
@@ -141,19 +107,10 @@ local function loadConfig()
     if not readfile or not isfile or not isfile(CONFIG_FILE) then return end
     pcall(function()
         local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
-        if type(data) == "table" then
-            for k, v in pairs(data) do
-                if DefaultConfig[k] ~= nil then
-                    -- if loading FavoriteRarity saved as string, convert to table
-                    if k == "FavoriteRarity" and type(v) == "string" then
-                        Config[k] = {v}
-                    else
-                        Config[k] = v
-                    end
-                end
-            end
-            print("[Config] Settings loaded!")
+        for k, v in pairs(data) do
+            if DefaultConfig[k] ~= nil then Config[k] = v end
         end
+        print("[Config] Settings loaded!")
     end)
 end
 
@@ -303,9 +260,8 @@ end)
 print("[Anti-AFK] Protection enabled")
 
 -- ====================================================================
---                     AUTO FAVORITE (MULTI-RARITY, REAL-TIME)
+--                     AUTO FAVORITE
 -- ====================================================================
-
 local favoritedItems = {}
 
 local function isItemFavorited(uuid)
@@ -321,83 +277,67 @@ local function isItemFavorited(uuid)
     return success and result or false
 end
 
--- Favorite a single new item (called when new item detected)
-local function autoFavoriteByRarity(newItem)
-    if not Config.AutoFavorite or not newItem then return end
+local function autoFavoriteByRarity()
+    if not Config.AutoFavorite then return end
 
-    local targetRarities = {}
-    if type(Config.FavoriteRarity) == "table" then
-        targetRarities = Config.FavoriteRarity
-    elseif type(Config.FavoriteRarity) == "string" then
-        targetRarities = {Config.FavoriteRarity}
+    local targetRarities = Config.FavoriteRarity
+    if type(targetRarities) == "string" then
+        targetRarities = {targetRarities} -- pastikan selalu table
     end
 
-    local ok, data = pcall(function()
-        return ItemUtility:GetItemData(newItem.Id)
-    end)
-    if not ok or not data or not data.Data then return end
+    local favorited = 0
+    local skipped = 0
 
-    local rarity = getFishRarity(data)
-    local name = data.Data.Name or "Unknown"
+    local success = pcall(function()
+        local items = PlayerData:GetExpect("Inventory").Items
+        if not items or #items == 0 then return end
 
-    if rarity and table.find(targetRarities, rarity) and not isItemFavorited(newItem.UUID) then
-        pcall(function()
-            Events.favorite:FireServer(newItem.UUID)
-            favoritedItems[newItem.UUID] = true
-            print("[Auto Favorite] ⭐ Favorited " .. name .. " (" .. rarity .. ")")
-        end)
-    end
-end
+        for _, item in ipairs(items) do
+            local data = ItemUtility:GetItemData(item.Id)
+            if data and data.Data then
+                local itemName = data.Data.Name or "Unknown"
+                local rarity = getFishRarity(data)
 
--- Lightweight monitor for inventory changes (real-time-ish)
-task.spawn(function()
-    -- wait for PlayerData and Inventory to be ready
-    local tries = 0
-    while tries < 200 do
-        if PlayerData and PlayerData:GetExpect and pcall(function() return PlayerData:GetExpect("Inventory") end) then
-            break
-        end
-        tries = tries + 1
-        task.wait(0.1)
-    end
+                -- cek jika rarity ada di list target
+                local shouldFavorite = false
+                for _, r in ipairs(targetRarities) do
+                    if rarity == r then
+                        shouldFavorite = true
+                        break
+                    end
+                end
 
-    local inventory = nil
-    pcall(function() inventory = PlayerData:GetExpect("Inventory") end)
-    if not inventory or inventory.Items == nil then
-        warn("[Auto Favorite] Inventory not available — auto-favorite monitor not started.")
-        return
-    end
-
-    -- initialize lastCount
-    local items = PlayerData:GetExpect("Inventory").Items
-    local lastCount = type(items) == "table" and #items or 0
-
-    while task.wait(0.12) do
-        local ok, curItems = pcall(function() return PlayerData:GetExpect("Inventory").Items end)
-        if not ok or type(curItems) ~= "table" then
-            -- if PlayerData temporarily unavailable, skip this tick
-            lastCount = 0
-            task.wait(0.5)
-            -- skip rest of loop body by not executing the next block
-        else
-            if #curItems > lastCount then
-                -- assume new items appended at end; favorite each new
-                for i = lastCount + 1, #curItems do
-                    local newItem = curItems[i]
-                    if newItem then
-                        autoFavoriteByRarity(newItem)
+                if shouldFavorite then
+                    if not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
+                        Events.favorite:FireServer(item.UUID)
+                        favoritedItems[item.UUID] = true
+                        favorited = favorited + 1
+                        print("[Auto Favorite] ⭐ #" .. favorited .. " - " .. itemName .. " (" .. rarity .. ")")
+                        task.wait(0.3)
+                    else
+                        skipped = skipped + 1
                     end
                 end
             end
+        end
+    end)
 
-            -- update lastCount
-            lastCount = #curItems
+    if favorited > 0 then
+        print("[Auto Favorite] ✅ Complete! Favorited: " .. favorited)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(10)
+        if Config.AutoFavorite then
+            autoFavoriteByRarity()
         end
     end
 end)
 
 -- ====================================================================
---                     FISHING LOGIC (FROM test.lua)
+--                     FISHING LOGIC (FROM YOUR test.lua)
 -- ====================================================================
 local isFishing = false
 local fishingActive = false
@@ -421,42 +361,48 @@ local function reelIn()
     end)
 end
 
--- BLATANT MODE
+-- BLATANT MODE: Your exact implementation
 local function blatantFishingLoop()
     while fishingActive and Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
+            
+            -- Step 1: Rapid fire casts (2 parallel casts)
             pcall(function()
                 Events.equip:FireServer(1)
                 task.wait(0.01)
-
+                
+                -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
-
+                
                 task.wait(0.05)
-
+                
+                -- Cast 2 (overlapping)
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
-
+            
+            -- Step 2: Wait for fish to bite
             task.wait(Config.FishDelay)
-
+            
+            -- Step 3: Spam reel 5x to instant catch
             for i = 1, 5 do
-                pcall(function()
-                    Events.fishing:FireServer()
+                pcall(function() 
+                    Events.fishing:FireServer() 
                 end)
                 task.wait(0.01)
             end
-
+            
+            -- Step 4: Short cooldown (50% faster)
             task.wait(Config.CatchDelay * 0.5)
-
+            
             isFishing = false
             print("[Blatant] ⚡ Fast cycle")
         else
@@ -465,17 +411,17 @@ local function blatantFishingLoop()
     end
 end
 
--- NORMAL MODE
+-- NORMAL MODE: Your exact implementation
 local function normalFishingLoop()
     while fishingActive and not Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
+            
             castRod()
             task.wait(Config.FishDelay)
             reelIn()
             task.wait(Config.CatchDelay)
-
+            
             isFishing = false
         else
             task.wait(0.1)
@@ -483,6 +429,7 @@ local function normalFishingLoop()
     end
 end
 
+-- Main fishing controller
 local function fishingLoop()
     while fishingActive do
         if Config.BlatantMode then
@@ -500,8 +447,8 @@ end
 task.spawn(function()
     while true do
         if Config.AutoCatch and not isFishing then
-            pcall(function()
-                Events.fishing:FireServer()
+            pcall(function() 
+                Events.fishing:FireServer() 
             end)
         end
         task.wait(Config.CatchDelay)
@@ -543,7 +490,7 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "🎣 RiooHub V1.0.3",
+    Name = "🎣 RiooHub V1.0.0",
     LoadingTitle = "RiooHub - Fish It",
     LoadingSubtitle = "Working Method Implementation",
     ConfigurationSaving = {
@@ -572,7 +519,7 @@ local AutoFishToggle = MainTab:CreateToggle({
     Callback = function(value)
         Config.AutoFish = value
         fishingActive = value
-
+        
         if value then
             print("[Auto Fish] 🟢 Started " .. (Config.BlatantMode and "(BLATANT MODE)" or "(Normal)"))
             task.spawn(fishingLoop)
@@ -580,7 +527,7 @@ local AutoFishToggle = MainTab:CreateToggle({
             print("[Auto Fish] 🔴 Stopped")
             pcall(function() Events.unequip:FireServer() end)
         end
-
+        
         saveConfig()
     end
 })
@@ -662,47 +609,68 @@ MainTab:CreateButton({
     end
 })
 
--- ====== FAVORITE TAB ======
+-- ====== MAIN TAB ======
 local FavoriteTab = Window:CreateTab("Favorite", 4483362458)
+
 FavoriteTab:CreateSection("Auto Favorite")
 
-FavoriteTab:CreateToggle({
-    Name = "⭐ Auto Favorite Fish",
-    CurrentValue = Config.AutoFavorite,
-    Callback = function(value)
-        Config.AutoFavorite = value
-        print("[Auto Favorite] " .. (value and "🟢 Enabled" or "🔴 Disabled"))
-        saveConfig()
-    end
-})
+-- list semua rarity
+local rarityList = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"}
 
--- Multi-selection dropdown with safe callback (no :Set())
-local FavoriteRarityDropdown = FavoriteTab:CreateDropdown({
-    Name = "Favorite Rarity",
-    Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
-    MultipleOptions = true,
-    CurrentOption = type(Config.FavoriteRarity) == "table" and Config.FavoriteRarity or {Config.FavoriteRarity},
-    Callback = function(options)
-        if type(options) ~= "table" then
-            options = {options}
+-- pastikan Config.FavoriteRarity selalu table
+if type(Config.FavoriteRarity) ~= "table" then
+    Config.FavoriteRarity = {} -- default kosong
+end
+
+-- function untuk favorite/unfavorite real-time
+local function updateFavorites()
+    local items = PlayerData:GetExpect("Inventory").Items
+    if not items or #items == 0 then return end
+
+    for _, item in ipairs(items) do
+        local data = ItemUtility:GetItemData(item.Id)
+        if data and data.Data then
+            local rarity = getFishRarity(data)
+            local uuid = item.UUID
+
+            local shouldFavorite = table.find(Config.FavoriteRarity, rarity)
+
+            if shouldFavorite and not favoritedItems[uuid] and not isItemFavorited(uuid) then
+                pcall(function() Events.favorite:FireServer(uuid) end)
+                favoritedItems[uuid] = true
+                print("[Auto Favorite] ⭐ Favorited: " .. (data.Data.Name or "Unknown") .. " (" .. rarity .. ")")
+            end
         end
-
-        Config.FavoriteRarity = options
-        saveConfig()
-
-        local display = #options == 0 and "None Selected" or table.concat(options, ", ")
-        print("[Config] Favorite rarities: " .. display)
-
-        -- Use notify (safe) to show current selection instead of :Set()
-        pcall(function()
-            Rayfield:Notify({
-                Title = "Favorite Rarity Updated",
-                Content = display,
-                Duration = 3
-            })
-        end)
     end
-})
+end
+
+-- buat toggle untuk tiap rarity
+for _, rarity in ipairs(rarityList) do
+    FavoriteTab:CreateToggle({
+        Name = "⭐ Favorite " .. rarity,
+        CurrentValue = table.find(Config.FavoriteRarity, rarity) and true or false,
+        Callback = function(value)
+            if value then
+                if not table.find(Config.FavoriteRarity, rarity) then
+                    table.insert(Config.FavoriteRarity, rarity)
+                end
+            else
+                for i, r in ipairs(Config.FavoriteRarity) do
+                    if r == rarity then
+                        table.remove(Config.FavoriteRarity, i)
+                        break
+                    end
+                end
+            end
+
+            saveConfig()
+            print("[Config] Favorite rarities now: " .. (next(Config.FavoriteRarity) and table.concat(Config.FavoriteRarity, ", ") or "None"))
+
+            -- update favorit langsung
+            task.spawn(updateFavorites)
+        end
+    })
+end
 
 -- ====== TELEPORT TAB ======
 local TeleportTab = Window:CreateTab("Teleport", 4483362458)
@@ -795,7 +763,7 @@ InfoTab:CreateParagraph({
 • Anti-AFK Protection
 • Auto Save Configuration
 • Teleport System (dev1.lua method)
-• Auto Favorite (multi-rarity, real-time)
+• Auto Favorite (Mythic & Secret only)
     ]]
 })
 
@@ -825,7 +793,7 @@ Rayfield:Notify({
     Image = 4483362458
 })
 
-print("🎣 RiooHub V1.0.3 - Loaded!")
+print("🎣 RiooHub V1.0.0 - Loaded!")
 print("✅ Using YOUR working fishing method")
 print("✅ Blatant Mode available")
 print("✅ Teleport system from dev1.lua integrated")
