@@ -337,18 +337,12 @@ task.spawn(function()
 end)
 
 -- ====================================================================
---                     FISHING - V1
+--                     FISHING LOGIC (FROM YOUR test.lua)
 -- ====================================================================
--- GLOBAL TOGGLES
-getgenv().AutoFishV1 = false
-
--- =========================================
--- V1 SETUP (Events)
--- =========================================
-local Events = {} -- pastikan Events diisi sesuai script asli kamu
 local isFishing = false
 local fishingActive = false
 
+-- Helper functions
 local function castRod()
     pcall(function()
         Events.equip:FireServer(1)
@@ -356,57 +350,78 @@ local function castRod()
         Events.charge:InvokeServer(1755848498.4834)
         task.wait(0.02)
         Events.minigame:InvokeServer(1.2854545116425, 1)
-        print("[V1] 🎣 Cast")
+        print("[Fishing] 🎣 Cast")
     end)
 end
 
 local function reelIn()
     pcall(function()
         Events.fishing:FireServer()
-        print("[V1] ✅ Reel")
+        print("[Fishing] ✅ Reel")
     end)
 end
 
+-- BLATANT MODE: Your exact implementation
 local function blatantFishingLoop()
-    while fishingActive and getgenv().AutoFishV1 do
+    while fishingActive and Config.BlatantMode do
         if not isFishing then
             isFishing = true
+            
+            -- Step 1: Rapid fire casts (2 parallel casts)
             pcall(function()
                 Events.equip:FireServer(1)
                 task.wait(0.01)
+                
+                -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
+                
                 task.wait(0.05)
+                
+                -- Cast 2 (overlapping)
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
+            
+            -- Step 2: Wait for fish to bite
             task.wait(Config.FishDelay)
-            for i = 1,5 do
-                pcall(function() Events.fishing:FireServer() end)
+            
+            -- Step 3: Spam reel 5x to instant catch
+            for i = 1, 5 do
+                pcall(function() 
+                    Events.fishing:FireServer() 
+                end)
                 task.wait(0.01)
             end
+            
+            -- Step 4: Short cooldown (50% faster)
             task.wait(Config.CatchDelay * 0.5)
+            
             isFishing = false
+            print("[Blatant] ⚡ Fast cycle")
         else
             task.wait(0.01)
         end
     end
 end
 
+-- NORMAL MODE: Your exact implementation
 local function normalFishingLoop()
-    while fishingActive and getgenv().AutoFishV1 do
+    while fishingActive and not Config.BlatantMode do
         if not isFishing then
             isFishing = true
+            
             castRod()
             task.wait(Config.FishDelay)
             reelIn()
             task.wait(Config.CatchDelay)
+            
             isFishing = false
         else
             task.wait(0.1)
@@ -414,9 +429,9 @@ local function normalFishingLoop()
     end
 end
 
-local function fishingV1Loop()
-    fishingActive = true
-    while getgenv().AutoFishV1 do
+-- Main fishing controller
+local function fishingLoop()
+    while fishingActive do
         if Config.BlatantMode then
             blatantFishingLoop()
         else
@@ -424,7 +439,6 @@ local function fishingV1Loop()
         end
         task.wait(0.1)
     end
-    fishingActive = false
 end
 
 -- ====================================================================
@@ -490,7 +504,7 @@ local MainTab = Window:CreateTab("Main", 4483362458)
 MainTab:CreateSection("Auto Fishing")
 
 local BlatantToggle = MainTab:CreateToggle({
-    Name = "⚡ BLATANT MODE",
+    Name = "⚡ BLATANT MODE (3x Faster!)",
     CurrentValue = Config.BlatantMode,
     Callback = function(value)
         Config.BlatantMode = value
@@ -499,14 +513,22 @@ local BlatantToggle = MainTab:CreateToggle({
     end
 })
 
-local AutoFishV1Toggle = MainTab:CreateToggle({
-    Name = "🎣 Auto Fish V1",
-    CurrentValue = false,
+local AutoFishToggle = MainTab:CreateToggle({
+    Name = "🤖 Auto Fish",
+    CurrentValue = Config.AutoFish,
     Callback = function(value)
-        getgenv().AutoFishV1 = value
+        Config.AutoFish = value
+        fishingActive = value
+        
         if value then
-            task.spawn(fishingV1Loop)
+            print("[Auto Fish] 🟢 Started " .. (Config.BlatantMode and "(BLATANT MODE)" or "(Normal)"))
+            task.spawn(fishingLoop)
+        else
+            print("[Auto Fish] 🔴 Stopped")
+            pcall(function() Events.unequip:FireServer() end)
         end
+        
+        saveConfig()
     end
 })
 
@@ -670,27 +692,42 @@ local SettingsTab = Window:CreateTab("Settings", 4483362458)
 SettingsTab:CreateSection("Performance")
 
 local AntiLagToggle = SettingsTab:CreateToggle({
-    Name = "Anti Lag / Low Texture",
+    Name = "⚡ Anti Lag / Lite Mode",
     CurrentValue = Config.AntiLag,
     Callback = function(value)
         Config.AntiLag = value
 
         if value then
-            -- Enable Anti Lag
+            -- Nonaktifkan efek berat tanpa destroy objek penting
             for _, obj in pairs(game:GetDescendants()) do
-                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Explosion") then
-                    obj:Destroy()
+                if obj:IsA("ParticleEmitter") or obj:IsA("Explosion") then
+                    obj.Enabled = false
+                elseif obj:IsA("Trail") then
+                    -- Trail penting untuk fishing tetap diaktifkan
+                    local whitelist = {"FishCaughtTrail", "FishingRodTrail"}
+                    local keep = false
+                    for _, name in pairs(whitelist) do
+                        if obj.Name == name then
+                            keep = true
+                            break
+                        end
+                    end
+                    if not keep then
+                        obj.Enabled = false
+                    end
                 elseif obj:IsA("BasePart") then
                     obj.Material = Enum.Material.Plastic
                     obj.Reflectance = 0
                 end
             end
         else
-            -- Disable Anti Lag: bisa dikembalikan ke default (opsional)
+            -- Kembalikan efek & material
             for _, obj in pairs(game:GetDescendants()) do
-                if obj:IsA("BasePart") then
+                if obj:IsA("ParticleEmitter") or obj:IsA("Explosion") or obj:IsA("Trail") then
+                    obj.Enabled = true
+                elseif obj:IsA("BasePart") then
                     obj.Material = Enum.Material.SmoothPlastic
-                    obj.Reflectance = 0
+                    obj.Reflectance = 0.05
                 end
             end
         end
