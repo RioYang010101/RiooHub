@@ -1,6 +1,40 @@
--- ====================================================================
---                 RiooHub V1.0.3 - RAYFIELD UI EDITION (FIXED)
--- ====================================================================
+-- ============================================================
+-- Safe Loader for RiooHub (anti crash + GitHub rate limit)
+-- ============================================================
+
+local url = "https://raw.githubusercontent.com/RioYang010101/RiooHub/refs/heads/main/script.lua"
+
+local success, response = pcall(function()
+    return game:HttpGet(url)
+end)
+
+if success and type(response) == "string" and #response > 0 then
+    local loaded, loadErr = loadstring(response)
+    if loaded then
+        print("[RiooHub] ✅ Loaded successfully!")
+        pcall(loaded)
+    else
+        warn("[RiooHub] ⚠️ Script found but failed to compile:", loadErr)
+        if Rayfield and Rayfield.Notify then
+            Rayfield:Notify({
+                Title = "Load Error",
+                Content = "Script ditemukan tapi gagal dijalankan.\nCek isi file RiooHub/script.lua.",
+                Duration = 5
+            })
+        end
+    end
+else
+    warn("[RiooHub] ❌ Failed to fetch script. GitHub may be rate limited or offline.")
+    if Rayfield and Rayfield.Notify then
+        Rayfield:Notify({
+            Title = "GitHub Limit",
+            Content = "Server GitHub sedang sibuk / limit (HTTP 429).\nCoba lagi beberapa menit lagi.",
+            Duration = 7
+        })
+    else
+        print("[RiooHub] GitHub mungkin sedang limit, coba lagi nanti.")
+    end
+end
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
 local success, errorMsg = pcall(function()
