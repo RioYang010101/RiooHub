@@ -344,21 +344,21 @@ task.spawn(function()
             -- if PlayerData temporarily unavailable, skip this tick
             lastCount = 0
             task.wait(0.5)
-            continue
-        end
-
-        if #curItems > lastCount then
-            -- assume new items appended at end; favorite each new
-            for i = lastCount + 1, #curItems do
-                local newItem = curItems[i]
-                if newItem then
-                    autoFavoriteByRarity(newItem)
+            -- skip rest of loop body by not executing the next block
+        else
+            if #curItems > lastCount then
+                -- assume new items appended at end; favorite each new
+                for i = lastCount + 1, #curItems do
+                    local newItem = curItems[i]
+                    if newItem then
+                        autoFavoriteByRarity(newItem)
+                    end
                 end
             end
-        end
 
-        -- update lastCount
-        lastCount = #curItems
+            -- update lastCount
+            lastCount = #curItems
+        end
     end
 end)
 
@@ -387,7 +387,7 @@ local function reelIn()
     end)
 end
 
--- BLATANT MODE: Your exact implementation
+-- BLATANT MODE
 local function blatantFishingLoop()
     while fishingActive and Config.BlatantMode do
         if not isFishing then
