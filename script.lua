@@ -1,5 +1,5 @@
 -- ====================================================================
---                 RiooHub V1.0.0 - RAYFIELD UI EDITION
+--                 RiooHub V1.0.1 - RAYFIELD UI EDITION
 -- ====================================================================
 
 -- ====== CRITICAL DEPENDENCY VALIDATION ======
@@ -260,8 +260,9 @@ end)
 print("[Anti-AFK] Protection enabled")
 
 -- ====================================================================
---                     AUTO FAVORITE
+--                     AUTO FAVORITE (MULTI-RARITY VERSION)
 -- ====================================================================
+
 local favoritedItems = {}
 
 local function isItemFavorited(uuid)
@@ -280,9 +281,15 @@ end
 local function autoFavoriteByRarity()
     if not Config.AutoFavorite then return end
 
-    local targetRarities = Config.FavoriteRarity
-    if type(targetRarities) == "string" then
-        targetRarities = {targetRarities} -- pastikan selalu table
+    -- pastikan data config berupa table (multi-rarity)
+    local targetRarities = {}
+    if type(Config.FavoriteRarity) == "table" then
+        targetRarities = Config.FavoriteRarity
+    elseif type(Config.FavoriteRarity) == "string" then
+        targetRarities = {Config.FavoriteRarity}
+    else
+        warn("[Auto Favorite] ⚠️ Invalid rarity data type")
+        return
     end
 
     local favorited = 0
@@ -298,24 +305,16 @@ local function autoFavoriteByRarity()
                 local itemName = data.Data.Name or "Unknown"
                 local rarity = getFishRarity(data)
 
-                -- cek jika rarity ada di list target
-                local shouldFavorite = false
-                for _, r in ipairs(targetRarities) do
-                    if rarity == r then
-                        shouldFavorite = true
-                        break
-                    end
-                end
-
+                local shouldFavorite = table.find(targetRarities, rarity) ~= nil
                 if shouldFavorite then
                     if not isItemFavorited(item.UUID) and not favoritedItems[item.UUID] then
                         Events.favorite:FireServer(item.UUID)
                         favoritedItems[item.UUID] = true
-                        favorited = favorited + 1
+                        favorited += 1
                         print("[Auto Favorite] ⭐ #" .. favorited .. " - " .. itemName .. " (" .. rarity .. ")")
                         task.wait(0.3)
                     else
-                        skipped = skipped + 1
+                        skipped += 1
                     end
                 end
             end
@@ -324,6 +323,8 @@ local function autoFavoriteByRarity()
 
     if favorited > 0 then
         print("[Auto Favorite] ✅ Complete! Favorited: " .. favorited)
+    else
+        print("[Auto Favorite] ℹ️ No new items to favorite")
     end
 end
 
@@ -490,7 +491,7 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "🎣 RiooHub V1.0.0",
+    Name = "🎣 RiooHub V1.0.1",
     LoadingTitle = "RiooHub - Fish It",
     LoadingSubtitle = "Working Method Implementation",
     ConfigurationSaving = {
@@ -611,7 +612,6 @@ MainTab:CreateButton({
 
 -- ====== MAIN TAB ======
 local FavoriteTab = Window:CreateTab("Favorite", 4483362458)
-
 FavoriteTab:CreateSection("Auto Favorite")
 
 local AutoFavoriteToggle = FavoriteTab:CreateToggle({
@@ -624,21 +624,45 @@ local AutoFavoriteToggle = FavoriteTab:CreateToggle({
     end
 })
 
+-- 🆕 MULTI-SELECTION DROPDOWN
 local FavoriteRarityDropdown = FavoriteTab:CreateDropdown({
-    Name = "Favorite Rarity (Mythic/Secret Only)",
-    Options = {"Mythic", "Secret"},
-    CurrentOption = Config.FavoriteRarity,
-    Callback = function(option)
-        Config.FavoriteRarity = option
-        print("[Config] Favorite rarity set to: " .. option .. "+")
+    Name = "Favorite Rarity (Select Multiple)",
+    Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
+    MultipleOptions = true,
+    CurrentOption = type(Config.FavoriteRarity) == "table" and Config.FavoriteRarity or {Config.FavoriteRarity},
+    Callback = function(options)
+        if type(options) ~= "table" then
+            options = {options}
+        end
+        Config.FavoriteRarity = options
+        print("[Config] Favorite rarities set to: " .. table.concat(options, ", "))
         saveConfig()
     end
 })
 
 FavoriteTab:CreateButton({
-    Name = "⭐ Favorite All Mythic/Secret Now",
+    Name = "⭐ Favorite Selected Rarity Now",
     Callback = function()
         autoFavoriteByRarity()
+    end
+})
+
+-- OPSIONAL: Tombol cepat pilih semua / hapus semua
+FavoriteTab:CreateButton({
+    Name = "🟩 Select All Rarities",
+    Callback = function()
+        Config.FavoriteRarity = {"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}
+        Rayfield:Notify({Title="Favorite", Content="All rarities selected!", Duration=3})
+        saveConfig()
+    end
+})
+
+FavoriteTab:CreateButton({
+    Name = "🟥 Clear Selection",
+    Callback = function()
+        Config.FavoriteRarity = {}
+        Rayfield:Notify({Title="Favorite", Content="All selections cleared!", Duration=3})
+        saveConfig()
     end
 })
 
@@ -763,7 +787,7 @@ Rayfield:Notify({
     Image = 4483362458
 })
 
-print("🎣 RiooHub V1.0.0 - Loaded!")
+print("🎣 RiooHub V1.0.1 - Loaded!")
 print("✅ Using YOUR working fishing method")
 print("✅ Blatant Mode available")
 print("✅ Teleport system from dev1.lua integrated")
