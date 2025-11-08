@@ -48,7 +48,7 @@
 
 ### Method 1: Direct Execution (Recommended)
 ```lua
-loadstring(game:HttpGet('https://gist.githubusercontent.com/nandafjng/3bfcba477c5ff48f10bc59b02526e98a/raw/8474851fa3aa831a3c9708da696221a4e3e9a982/gistfile1.txt'))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RioYang010101/RiooHub/refs/heads/main/script.lua"))()
 ```
 
 ### Method 2: Manual Installation
